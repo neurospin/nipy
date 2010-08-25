@@ -59,30 +59,30 @@ def _hierarchical_asso(bfl,dmax):
     geb = []
     ged = []
     for s in range(nbsubj):
-        if bfl[s].k>0: # us not None:
-            for t in range(s):
-                if bfl[t].k >0: #is not None :
-                    cs =  bfl[s].get_roi_feature('position')
-                    ct = bfl[t].get_roi_feature('position')
-                    Gs = bfl[s].make_forest()
-                    Gs.anti_symmeterize()
+        if bfl[s].k<1:
+            continue
+        for t in range(s):
+            if bfl[t].k <1:
+                continue 
+            cs =  bfl[s].get_roi_feature('position')
+            ct = bfl[t].get_roi_feature('position')
+            Gs = bfl[s].make_forest()
+            Gs.anti_symmeterize()
             
-                    Gt = bfl[t].make_forest()
-                    Gt.anti_symmeterize()
+            Gt = bfl[t].make_forest()
+            Gt.anti_symmeterize()
 
-                    ea,eb,ed = BPmatch.BPmatch_slow_asym_dev(
-                        cs, ct, Gs, Gt, dmax)
-                    if np.size(ea)>0:
-                        gea = np.hstack((gea, ea+cnlm[s]))
-                        geb = np.hstack((geb, eb+cnlm[t]))
-                        ged = np.hstack((ged, ed))
+            ea,eb,ed = BPmatch.BPmatch_slow_asym_dev( cs, ct, Gs, Gt, dmax)
+            if np.size(ea)>0:
+                gea = np.hstack((gea, ea+cnlm[s]))
+                geb = np.hstack((geb, eb+cnlm[t]))
+                ged = np.hstack((ged, ed))
 
-                    ea,eb,ed = BPmatch.BPmatch_slow_asym_dev(
-                        ct, cs, Gt, Gs, dmax)
-                    if np.size(ea)>0:
-                        gea = np.hstack((gea, ea+cnlm[t]))
-                        geb = np.hstack((geb, eb+cnlm[s]))
-                        ged = np.hstack((ged, ed))
+            ea,eb,ed = BPmatch.BPmatch_slow_asym_dev( ct, cs, Gt, Gs, dmax)
+            if np.size(ea)>0:
+                gea = np.hstack((gea, ea+cnlm[t]))
+                geb = np.hstack((geb, eb+cnlm[s]))
+                ged = np.hstack((ged, ed))
 
     if np.size(gea)>0:
         edges = np.transpose([gea, geb]).astype(np.int)
@@ -186,6 +186,10 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
          the coordinates of the of the terminal regions
+
+    Fixme
+    -----
+    Should allow for subject specific domains
     """
     from hroi import HROI_as_discrete_domain_blobs
     bf = []
