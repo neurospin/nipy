@@ -390,7 +390,6 @@ def bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
 
     # make a group-level map of the landmark position        
     crmap = _relabel_(label, nl)   
-    
     return crmap, LR, bf, p
 
 
