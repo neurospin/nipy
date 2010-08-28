@@ -11,44 +11,106 @@ import nipy.neurospin.glm_files_layout.tio as tio
 
 from nipy.neurospin.spatial_models.discrete_domain import domain_from_mesh
 import nipy.neurospin.spatial_models.bayesian_structural_analysis as bsa
+import nipy.neurospin.spatial_models.structural_bfls as sbf
+from nipy.neurospin.clustering.von_mises_fisher_mixture import select_vmm, VonMisesMixture
 
 
 
-def dpmm(gfc, alpha, g0, g1, dof, prior_precision, gf1, sub, burnin,
-         spatial_coords=None, nis=1000, co_clust=False, verbose=False):
+def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     """
-    Apply the dpmm analysis to the data: python version
-    """
-    from nipy.neurospin.clustering.imm import MixedIMM
-    dim = gfc.shape[1]
-    migmm = MixedIMM(alpha, dim)
-    migmm.set_priors(gfc)
-    migmm.set_constant_densities(null_dens=g0, prior_dens=g1)
-    migmm._prior_dof = dof
-    migmm._prior_scale = np.diag(prior_precision[0]/dof)
-    migmm._inv_prior_scale_ = [np.diag(dof*1./(prior_precision[0]))]
-    migmm.sample(gfc, null_class_proba=1-gf1, niter=burnin, init=False,
-                 kfold=sub)
-    if verbose:
-        print 'number of components: ', migmm.k
-
-    #sampling
-    if co_clust:
-        like, pproba, co_clust =  migmm.sample(
-            gfc, null_class_proba=1-gf1, niter=nis,
-            sampling_points=spatial_coords, kfold=sub, co_clustering=co_clust)
-        if verbose:
-            print 'number of components: ', migmm.k
-        
-        return like, 1-pproba, co_clust
-    else:
-        like, pproba =  migmm.sample(
-            gfc, null_class_proba=1-gf1, niter=nis,
-            sampling_points=spatial_coords, kfold=sub, co_clustering=co_clust)
-    if verbose:
-        print 'number of components: ', migmm.k
+    Estimation of the population level model of activation density using 
+    dpmm and inference
     
-    return like, 1-pproba
+    Parameters
+    ----------
+    bf list of nipy.neurospin.spatial_models.hroi.HierarchicalROI instances
+       representing individual ROIs
+       let nr be the number of terminal regions across subjects
+    gf0, array of shape (nr)
+         the mixture-based prior probability 
+         that the terminal regions are true positives
+    sub, array of shape (nr)
+         the subject index associated with the terminal regions
+    gfc, array of shape (nr, coord.shape[1])
+         the coordinates of the of the terminal regions
+    dmax float>0:
+         expected cluster std in the common space in units of coord
+    thq = 0.5 (float in the [0,1] interval)
+        p-value of the prevalence test
+    ths=0, float in the rannge [0,nsubj]
+        null hypothesis on region prevalence that is rejected during inference
+    verbose=0, verbosity mode
+
+    Returns
+    -------
+    crmap: array of shape (nnodes):
+           the resulting group-level labelling of the space
+    LR: a instance of sbf.LandmarkRegions that describes the ROIs found
+        in inter-subject inference
+        If no such thing can be defined LR is set to None
+    bf: List of  nipy.neurospin.spatial_models.hroi.Nroi instances
+        representing individual ROIs
+    p: array of shape (nnodes):
+       likelihood of the data under H1 over some sampling grid
+    """
+    dom = bf[0].domain
+    n_subj = len(bf)
+    
+    crmap = -np.ones(dom.size, np.int)
+    LR = None
+    p = np.zeros(dom.size)
+    if len(sub)<1:
+        return crmap, LR, bf, p
+
+    sub = np.concatenate(sub).astype(np.int) 
+    gfc = np.concatenate(gfc)
+    gf0 = np.concatenate(gf0)
+
+    # launch the VMM
+    precision = 50.
+    vmm = select_vmm(range(1, 15), precision, True, gfc)
+    if verbose:
+        vmm.show(gfc)
+
+    print vmm.k
+    z = vmm.responsibilities(gfc)    
+    label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
+    
+    # append some information to the hroi in each subject
+    for s in range(n_subj):
+        bfs = bf[s]
+        if bfs.k>0 :
+            leaves = bfs.isleaf()
+            us = -np.ones(bfs.k).astype(np.int)
+
+            # set posterior proba
+            lq = np.zeros(bfs.k)
+            lq[leaves] = 1-z[sub==s, 0]
+            bfs.set_roi_feature('posterior_proba', lq)
+
+            # set prior proba
+            lq = np.zeros(bfs.k)
+            lq[leaves] = 1-gf0[sub==s]
+            bfs.set_roi_feature('prior_proba', lq)
+
+            j = z[sub==s].argmax(1)-1
+            us[leaves] = j[leaves]
+
+            # when parent regions has similarly labelled children,
+            # include it also
+            us = bfs.make_forest().propagate_upward(us)
+            bfs.set_roi_feature('label',us)
+                        
+    # derive the group-level landmarks
+    # with a threshold on the number of subjects
+    # that are represented in each one 
+    LR, nl = sbf.build_LR(bf, thq, ths, dmax, verbose=verbose)
+
+    # make a group-level map of the landmark position        
+    crmap = bsa._relabel_(label, nl)   
+    return crmap, LR, bf, p
+
+
 
 
 def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
@@ -64,16 +126,16 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     """
     nbsubj = len(meshes)
     coord = []
-    r0 = 70.
+    r0 = 1.
 
     mesh_dom = domain_from_mesh(meshes[0])
     ## get the surface-based coordinates
     latitude = tio.Texture(texlat[0]).read(texlat[0]).data
     latitude = latitude-latitude.min()
     longitude = tio.Texture(texlat[0]).read(texlon[0]).data
-    print latitude.min(),latitude.max(),longitude.min(),longitude.max()
-    latitude = np.random.rand(mesh_dom.size) * 2  * np.pi
-    longitude = np.random.rand(mesh_dom.size) * np.pi
+
+    #latitude = np.random.rand(mesh_dom.size) * 2  * np.pi
+    #longitude = np.random.rand(mesh_dom.size) * np.pi
     coord = r0*np.vstack((np.sin(latitude) * np.cos(longitude),
                           np.sin(latitude) * np.sin(longitude),
                           np.cos(latitude))).T
@@ -107,8 +169,8 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         """
         
         #import Texture
-        #functional_data = tio.Texture(texfun[s][0]).read(texfun[s][0]).data
-        functional_data = np.random.randn(mesh_dom.size)
+        functional_data = tio.Texture(texfun[s]).read(texfun[s]).data
+        #functional_data = np.random.randn(mesh_dom.size)
         
         lbeta.append(functional_data)
         
@@ -117,7 +179,8 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         mesh_dom, lbeta, smin, theta, method='prior')
 
     verbose = 1
-    crmap, LR, bf, p = bsa.bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
+    #crmap, LR, bf, p = bsa.bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
+    crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
     """
     v0 = (4*np.pi*r0**2)*np.sqrt(2*np.pi)*dmax
@@ -195,7 +258,7 @@ texlat = [op.join(datadir,"sphere/ico100_7_lat.tex") for s in subj_id]
 texlon = [op.join(datadir,"sphere/ico100_7_lon.tex") for s in subj_id]
 
 # left hemisphere
-texfun = [op.join(datadir,"s%s/fct/glm/default/contrast/left_computation-sentences_z_map.tex") for s in subj_id]
+texfun = [op.join(datadir,"%s/fct/glm/default/Contrast/left_computation-sentences_z_map.tex"%s) for s in subj_id]
 #meshes = [op.join(datadir,"s%s/surf/lh.white.gii" %s) for s in subj_id]
 meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
