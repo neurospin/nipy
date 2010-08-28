@@ -62,16 +62,16 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     Write the doc
     replace with nibabel gifti io
     """
-    nbsubj = 3#len(meshes)
+    nbsubj = len(meshes)
     coord = []
     r0 = 70.
 
     mesh_dom = domain_from_mesh(meshes[0])
     ## get the surface-based coordinates
-    #latitude = tio.Texture(texlat[s]).read(texlat[s]).data
-    #latitude = latitude-latitude.min()
-    #longitude = tio.Texture(texlat[s]).read(texlon[s]).data
-    #print latitude.min(),latitude.max(),longitude.min(),longitude.max()
+    latitude = tio.Texture(texlat[0]).read(texlat[0]).data
+    latitude = latitude-latitude.min()
+    longitude = tio.Texture(texlat[0]).read(texlon[0]).data
+    print latitude.min(),latitude.max(),longitude.min(),longitude.max()
     latitude = np.random.rand(mesh_dom.size) * 2  * np.pi
     longitude = np.random.rand(mesh_dom.size) * np.pi
     coord = r0*np.vstack((np.sin(latitude) * np.cos(longitude),
@@ -114,7 +114,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         
     lbeta = np.array(lbeta).T
     bf, gf0, sub, gfc = bsa.compute_individual_regions (
-        mesh_dom, lbeta, smin=10, theta=3.5, method='prior')
+        mesh_dom, lbeta, smin, theta, method='prior')
 
     verbose = 1
     crmap, LR, bf, p = bsa.bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
@@ -182,28 +182,26 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     
 
 
-nbeta = [29] # experimental condition
-theta = 2.2
-dmax = 5.
+theta = 3.5
+dmax = 10.
 ths = 2
 smin = 5
 thq = 0.9
 
-subj_id = [ '12069']
+subj_id = [ 's12069',  's12300',  's12370',  's12405',  's12432',  's12539',  's12635',  's12913',  's12081',  's12344',  's12381',  's12414',  's12508',  's12562',  's12636',  's12919',  's12165',  's12352',  's12401',  's12431',  's12532',  's12590',  's12898',  's12920'] [:10]
 nbsubj = len(subj_id)
-datadir = "/data/thirion/virgile_internship/"
-texlat = [op.join(datadir,"s%s/brainvisa_s%s/surface/s%s_L_lat.tex" %(s, s, s))
-          for s in subj_id]
-texlon = [op.join(datadir,"s%s/brainvisa_s%s/surface/s%s_L_lon.tex" %(s, s, s))
-          for s in subj_id]
+datadir = "/data/thirion/virgile_internship_light/"
+texlat = [op.join(datadir,"sphere/ico100_7_lat.tex") for s in subj_id]
+texlon = [op.join(datadir,"sphere/ico100_7_lon.tex") for s in subj_id]
 
 # left hemisphere
-texfun = [[op.join(datadir,"s%s/fct/loc1/L_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
-meshes = [op.join(datadir,"s%s/surf/lh.white.gii" %s) for s in subj_id]
+texfun = [op.join(datadir,"s%s/fct/glm/default/contrast/left_computation-sentences_z_map.tex") for s in subj_id]
+#meshes = [op.join(datadir,"s%s/surf/lh.white.gii" %s) for s in subj_id]
+meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 
 AF,BF = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
-                         thq, swd, nbeta=nbeta)
+                         thq, swd)
 
 
 
