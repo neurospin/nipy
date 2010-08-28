@@ -97,9 +97,9 @@ class Texture(object):
             #
             # TODO some sanity check on data length
             p.data = []
+            
             for t in range(nb_t):
-                # go forward in the buffer
-                f_in.read(4)
+                tmp = (_np.frombuffer(f_in.read(4), _np.uint32))
                 nbitems = (_np.frombuffer(f_in.read(4), _np.uint32))[0]
                 size = nbitems*datatype().nbytes
                 p.data.append(_np.frombuffer(f_in.read(size),datatype))
