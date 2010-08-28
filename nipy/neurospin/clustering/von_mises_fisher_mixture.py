@@ -223,10 +223,25 @@ def estimate_robust_vmm(k, precision, null_class, x, ninit=10, maxiter=100):
         if ll>score:
             best_model = aux
             score = ll
+    print score
     return best_model
 
 def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
     """
+    return the best von_mises mixture after severla initialization
+    
+    Parameters
+    ----------
+    krange: list of ints,
+            number of classes to consider
+    precision:
+    null class:
+    x: array fo shape(n,3)
+       should be on the unit sphere
+    k: int, optional
+    ninit: int, optional,
+           number of iterations
+    maxiter: int, optional,
     """
     score = -np.infty
     for k in krange:
@@ -239,6 +254,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
         if bic>score:
             best_model = aux
             score = ll
+    print krange
     return best_model
 
 
@@ -260,25 +276,24 @@ def sphere_density(npoints):
            np.pi**2*2*1./(npoints**2)
     return s, area
 
-            
-x1 = [0.6, 0.48, 0.64]
-x2 = [-0.8, 0.48, 0.36]
-x3 = [0.48, 0.64, -0.6]
-x = np.random.randn(200,3)*.1
-x[:30] += x1
-x[40:150] += x2
-x[150:] += x3
-x = (x.T/np.sqrt(np.sum(x**2,1))).T
+def example():
+    x1 = [0.6, 0.48, 0.64]
+    x2 = [-0.8, 0.48, 0.36]
+    x3 = [0.48, 0.64, -0.6]
+    x = np.random.randn(200,3)*.1
+    x[:30] += x1
+    x[40:150] += x2
+    x[150:] += x3
+    x = (x.T/np.sqrt(np.sum(x**2,1))).T
 
-precision = 100.
-k = 3
-vmm = select_vmm(range(2,7), precision, True, x)
-#vmm = estimate_robust_vmm(k, precision, True, x)
-#VonMisesMixture(k, precision, null_class=True)
-#vmm.estimate(x)
-vmm.show(x)
-
-
-# check that it sums to 1
-s, area = sphere_density(100)
-check_integral =  (vmm.mixture_likelihood(s)*area).sum()
+    precision = 100.
+    k = 3
+    vmm = select_vmm(range(2,7), precision, True, x)
+    #vmm = estimate_robust_vmm(k, precision, True, x)
+    #VonMisesMixture(k, precision, null_class=True)
+    #vmm.estimate(x)
+    vmm.show(x)
+    
+    # check that it sums to 1
+    s, area = sphere_density(100)
+    check_integral =  (vmm.mixture_likelihood(s)*area).sum()
