@@ -67,8 +67,8 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     gf0 = np.concatenate(gf0)
 
     # launch the VMM
-    precision = 50.
-    vmm = select_vmm(range(1, 15), precision, True, gfc)
+    precision = 100.
+    vmm = select_vmm(range(5, 20 ), precision, True, gfc)
     if verbose:
         vmm.show(gfc)
 
@@ -93,9 +93,8 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
             lq[leaves] = 1-gf0[sub==s]
             bfs.set_roi_feature('prior_proba', lq)
 
-            j = z[sub==s].argmax(1)-1
-            us[leaves] = j[leaves]
-
+            us[leaves] = z[sub==s].argmax(1)-1
+            
             # when parent regions has similarly labelled children,
             # include it also
             us = bfs.make_forest().propagate_upward(us)

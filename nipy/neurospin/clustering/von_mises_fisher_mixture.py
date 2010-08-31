@@ -50,10 +50,9 @@ class VonMisesMixture(object):
         like: array of shape(n, self.k)
         """
         n = x.shape[0]
-        constant = self.precision / (2*np.pi*(np.exp(self.precision)
-                                              -np.exp(-self.precision)))
+        constant = self.precision / (2*np.pi*(1-np.exp(-2*self.precision)))
         
-        loglike = np.dot(x, self.means.T)*self.precision
+        loglike = (np.dot(x, self.means.T)-1)*self.precision
         like = constant*np.exp(loglike)
         if self.null_class:
             like = np.hstack((1./(4*np.pi)*np.ones((n, 1)), like))
@@ -223,7 +222,6 @@ def estimate_robust_vmm(k, precision, null_class, x, ninit=10, maxiter=100):
         if ll>score:
             best_model = aux
             score = ll
-    print score
     return best_model
 
 def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
@@ -253,8 +251,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
              bic = ll-np.log(x.shape[0])*(k*3-1)/x.shape[0]
         if bic>score:
             best_model = aux
-            score = ll
-    print krange
+            score = bic
     return best_model
 
 
