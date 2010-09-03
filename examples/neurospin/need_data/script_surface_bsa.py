@@ -67,8 +67,8 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     gf0 = np.concatenate(gf0)
 
     # launch the VMM
-    precision = 100.
-    vmm = select_vmm(range(5, 20 ), precision, True, gfc)
+    precision = 500.
+    vmm = select_vmm(range(5, 50, 5 ), precision, True, gfc)
     if verbose:
         vmm.show(gfc)
 
