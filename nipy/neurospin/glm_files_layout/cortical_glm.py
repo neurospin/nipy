@@ -16,7 +16,6 @@ import numpy as np
 
 from ...externals.configobj import ConfigObj
 
-from . import glm_tools
 from . import tio
 
 
@@ -255,7 +254,8 @@ def glm_fit(fMRI_path, DesignMatrix=None,  output_glm=None, outputCon=None,
     # get the design matrix
     if isinstance(DesignMatrix, basestring):
         import nipy.neurospin.utils.design_matrix as dm
-        X = dm.DesignMatrix().read_from_csv(DesignMatrix).matrix
+        X = dm.dmtx_from_csv( DesignMatrix).matrix
+        #X = dm.DesignMatrix().read_from_csv(DesignMatrix).matrix
     else:
         X = DesignMatrix.matrix
   
@@ -309,16 +309,17 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
     sessions = misc['sessions']
     
     # get the contrasts
-    if isinstance(misc, basestring):
+    if isinstance(contrast_struct, basestring):
         contrast_struct = ConfigObj(contrast_struct) 
     contrasts_names = contrast_struct["contrast"]
 
     # get the glms
     designs = {}
+    
     if glms is not None:
-       designs = glms
+        designs = glms
     else:             
-        if not kargs.has_key('glms_config'):
+        if not kargs.has_key('glm_config'):
             raise ValueError, "No glms provided"
         else:
             import nipy.neurospin.glm as GLM
@@ -334,7 +335,6 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
         contrast_type = contrast_struct[contrast]["Type"]
         contrast_dimension = contrast_struct[contrast]["Dimension"]
         final_contrast = []
-        k = i+1
         multicon = dict()
 
         for key, value in contrast_struct[contrast].items():
@@ -356,7 +356,6 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
                     _con = designs[key].contrast(value)
                     final_contrast.append(_con)
 
-        design = designs[session]
         res_contrast = final_contrast[0]
         for c in final_contrast[1:]:
             res_contrast = res_contrast + c
