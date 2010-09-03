@@ -249,6 +249,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
             bic = ll-np.log(x.shape[0])*k*3/x.shape[0]
         else:
              bic = ll-np.log(x.shape[0])*(k*3-1)/x.shape[0]
+        print k, bic
         if bic>score:
             best_model = aux
             score = bic
