@@ -47,7 +47,8 @@ class VonMisesMixture(object):
 
         Returns
         -------
-        like: array of shape(n, self.k)
+        like: array of shape(n, self.k), with non-neagtive values
+              the likelihood
         """
         n = x.shape[0]
         constant = self.precision / (2*np.pi*(1-np.exp(-2*self.precision)))
@@ -130,7 +131,7 @@ class VonMisesMixture(object):
                  minimum number of iterations
         Return
         ------
-        ll: float, average log-likelihood
+        ll: float, average (across samples) log-likelihood 
         """
         # initialization with random positions and constant weights
         if self.weights is None:
@@ -236,7 +237,6 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
     null class:
     x: array fo shape(n,3)
        should be on the unit sphere
-    k: int, optional
     ninit: int, optional,
            number of iterations
     maxiter: int, optional,
@@ -254,6 +254,58 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
             best_model = aux
             score = bic
     return best_model
+
+def select_vmm_cv(krange, precision, null_class, x, cv_index,
+                  ninit=5, maxiter=100, verbose=0):
+    """
+    return the best von_mises mixture after severla initialization
+    
+    Parameters
+    ----------
+    krange: list of ints,
+            number of classes to consider
+    precision:
+    null class:
+    x: array fo shape(n,3)
+       should be on the unit sphere
+    cv_ndex: set of indices for cross validation
+    ninit: int, optional,
+           number of iterations
+    maxiter: int, optional,
+    """
+    score = -np.infty
+    n_folds = len(np.unique(cv_index))
+    mll = []
+    for k in krange:
+        mll.append(-np.infty)
+        for j in range(ninit):
+            ll = np.zeros_like(cv_index).astype(np.float)
+            for i in np.unique(cv_index):
+                xl = x[cv_index!=i]
+                xt = x[cv_index==i]
+                aux = estimate_robust_vmm(k, precision, null_class, xl,
+                                          1, maxiter)
+                ll[cv_index==i] = np.log(aux.mixture_likelihood(xt))
+            if ll.mean() > mll[-1]:
+                mll[-1] = ll.mean()
+                
+        aux = estimate_robust_vmm(k, precision, null_class, x,
+                                  ninit, maxiter)
+        #print len(np.unique(np.argmax(aux.responsibilities(x), 1)))
+
+        print k, mll[-1]
+        if mll[-1]>score:
+            best_model = aux
+            score = mll[-1]
+            
+    if verbose:
+        pylab.figure()
+        pylab.plot(mll)
+        pylab.set_title('Cross-Validated likelihood as a function of k')
+
+    return best_model
+
+
 
 
 def sphere_density(npoints):
