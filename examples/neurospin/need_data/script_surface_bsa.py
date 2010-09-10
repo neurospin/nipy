@@ -68,8 +68,8 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
 
     # launch the VMM
     precision = 500.
-    vmm = select_vmm(range(5, 50, 5 ), precision, True, gfc)
-    #vmm = select_vmm_cv(range(5, 50, 5), precision, True, gfc, sub)
+    #vmm = select_vmm(range(10, 40, 5 ), precision, True, gfc)
+    vmm = select_vmm_cv(range(10, 40, 5), precision, True, gfc, sub)
     if verbose:
         vmm.show(gfc)
 
@@ -180,7 +180,6 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         mesh_dom, lbeta, smin, theta, method='prior')
 
     verbose = 1
-    #crmap, LR, bf, p = bsa.bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
     if LR!=None:
@@ -197,15 +196,11 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     tio.Texture('', data=p).write(tex_labels_name)
     
     for s in range(nbsubj):
-        tex_labels_name = op.join(swd,"AR_s%04d_sd.tex" % (s, contrast_id))
-        label = -np.ones(domain.size, 'int16')
+        tex_labels_name = op.join(swd,"AR_s%04d_%s.tex" % (s, contrast_id))
+        label = -np.ones(mesh_dom.size, 'int32')
         #
-        if BF[s]!=None:
-            nls = BF[s].get_roi_feature('label').copy()
-            nls[nls==-1] = defindex
-            idx = BF[s].discrete_features['index']
-            for k in range(BF[s].k):
-                label[idx[k]] =  nls[k]
+        if bf[s]!=None:
+            label = bf[s].label.astype('int32')
         tio.Texture('', data=label).write(tex_labels_name)
     return LR, bf
     
@@ -214,7 +209,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
 theta = 3.5
 dmax = 10.
 ths = 2
-smin = 5
+smin = 10
 thq = 0.9
 
 subj_id = [ 's12069',  's12300',  's12370',  's12405',  's12432',  's12539',  's12635',  's12913',  's12081',  's12344',  's12381',  's12414',  's12508',  's12562',  's12636',  's12919',  's12165',  's12352',  's12401',  's12431',  's12532',  's12590',  's12898',  's12920'] [:10]
@@ -230,7 +225,7 @@ meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'left_computation-sentences'
 
-LR, BF = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
+LR, bf = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
                          thq, swd, contrast_id)
 
 
@@ -251,33 +246,12 @@ texfun = [[op.join(datadir,"s%s/fct/loc1/L_spmT_%04d.tex") % (s,b) for b in nbet
 meshes = [op.join(datadir,"average_brain/lh.average_brain.mesh") for s in subj_id]
 swd = "/tmp/freesurfer/left/"
 
-AF,BF = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
+AF,bf = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
 
 # right hemisphere
 texfun = [[op.join(datadir,"s%s/fct/loc1/R_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
 meshes = [op.join(datadir,"average_brain/rh.average_brain.mesh") for s in subj_id]
 swd = "/tmp/freesurfer/right/"
 
-AF,BF = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
-"""
-
-
-
-
-"""
-datadir = "/volatile/thirion/Localizer/"
-texfun = [[op.join(datadir,"sujet%02d/ftext/method_greg_python/L_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
-
-texlat = [op.join(datadir,"sujet%02d/surface/sujet%02d_L_lat.tex") % (s,s) for s in subj_id]
-texlon = [op.join(datadir,"sujet%02d/surface/sujet%02d_L_lon.tex") % (s,s) for s in subj_id]
-
-meshes = [op.join(datadir,"sujet%02d/mesh/sujet%02d_Lwhite.mesh") % (s,s) for s in subj_id]
-"""
-"""
-datadir = "/neurospin/lnao/Pmad/alan/jumeaux/Localizer/"
-texfun = [[op.join(datadir,"s%s/fMRI/acquisition/loc1/spm_analysis/spm_analysis_Norm_notS/L_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
-texlat = [op.join(datadir,"s%s/surface/s%s_L_lat.tex") % (s,s) for s in subj_id]
-texlon = [op.join(datadir,"s%s/surface/s%s_L_lon.tex") % (s,s) for s in subj_id]
-meshes = [op.join(datadir,"s%s/mesh/acquisition/s%s_Lwhite.mesh") % (s,s) for s in subj_id]
-swd = "/tmp/left/"
+AF,bf = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
 """
