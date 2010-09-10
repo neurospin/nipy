@@ -12,8 +12,8 @@ import nipy.neurospin.glm_files_layout.tio as tio
 from nipy.neurospin.spatial_models.discrete_domain import domain_from_mesh
 import nipy.neurospin.spatial_models.bayesian_structural_analysis as bsa
 import nipy.neurospin.spatial_models.structural_bfls as sbf
-from nipy.neurospin.clustering.von_mises_fisher_mixture import select_vmm, VonMisesMixture
-
+from nipy.neurospin.clustering.von_mises_fisher_mixture import select_vmm, \
+     select_vmm_cv, VonMisesMixture
 
 
 def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
@@ -69,6 +69,7 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     # launch the VMM
     precision = 500.
     vmm = select_vmm(range(5, 50, 5 ), precision, True, gfc)
+    #vmm = select_vmm_cv(range(5, 50, 5), precision, True, gfc, sub)
     if verbose:
         vmm.show(gfc)
 
@@ -113,7 +114,8 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
 
 
 def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
-                     ths = 0, thq = 0.5, smin = 0, swd = "/tmp/",nbeta = [0]):
+                     ths = 0, thq = 0.5, smin = 0, swd = "/tmp/",
+                     contrast_id='cid'):
     """
     Perform the computation of surface landmarks
     this function deals mainly with io
@@ -131,7 +133,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     ## get the surface-based coordinates
     latitude = tio.Texture(texlat[0]).read(texlat[0]).data
     latitude = latitude-latitude.min()
-    longitude = tio.Texture(texlat[0]).read(texlon[0]).data
+    longitude = tio.Texture('').read(texlon[0]).data
 
     #latitude = np.random.rand(mesh_dom.size) * 2  * np.pi
     #longitude = np.random.rand(mesh_dom.size) * np.pi
@@ -181,50 +183,22 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     #crmap, LR, bf, p = bsa.bsa_dpmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
-    """
-    v0 = (4*np.pi*r0**2)*np.sqrt(2*np.pi)*dmax
-    g0 = 1.0/v0
-    bdensity = 1
-
-    
-    crmap,AF,BF,p,label = compute_BSA_simple (
-    Fs,coord,dmax,thq, smin,ths, theta,g0,bdensity)
-    
-    
-    
-    W = aims.Writer()
-    if AF!=None:
-        defindex = AF.k+2
+    if LR!=None:
+        defindex = LR.k+2
     else:
         defindex = 0
     
     # write the resulting labelling
-    tex_labels_name = op.join(swd,"CR_%04d.tex"%nbeta[0]) 
-    nnode = np.size(crmap)
-    textureW = aims.TimeTexture_FLOAT()
-    tex1 = textureW[0] # First Time sample
-    tex1.reserve(nnode)
-    for i in range(nnode): tex1.append( crmap[i] )
-    W.write( textureW, tex_labels_name)
+    tex_labels_name = op.join(swd, "CR_%s.tex" % contrast_id)
+    tio.Texture('', data=crmap).write(tex_labels_name)
     
     #write the corresponding density
-    tex_labels_name = op.join(swd,"density_%04d.tex"%nbeta[0]) 
-    nnode = np.size(crmap)
-    textureW = aims.TimeTexture_FLOAT()
-    tex1 = textureW[0] # First Time sample
-    tex1.reserve(nnode)
-    for i in range(nnode): tex1.append( p[i] )
-    W.write( textureW, tex_labels_name)
-    mesh = R.read(meshes[0])
-    print mep.mesh_integrate(mesh,tex1), mep.mesh_integrate(mesh, tex1, coord[0])
-
-
+    tex_labels_name = op.join(swd, "density_%s.tex" % contrast_id) 
+    tio.Texture('', data=p).write(tex_labels_name)
+    
     for s in range(nbsubj):
-        tex_labels_name = op.join(swd,"AR_s%04d_%04d.tex"%(s,nbeta[0]))
-        #nnode = np.size(lw)
-        longitudeTex = R.read(texlon[s])
-        nnode = np.size(np.array(longitudeTex[0].data()))
-        label = -1*np.ones(nnode,'int16')
+        tex_labels_name = op.join(swd,"AR_s%04d_sd.tex" % (s, contrast_id))
+        label = -np.ones(domain.size, 'int16')
         #
         if BF[s]!=None:
             nls = BF[s].get_roi_feature('label').copy()
@@ -232,14 +206,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
             idx = BF[s].discrete_features['index']
             for k in range(BF[s].k):
                 label[idx[k]] =  nls[k]
-        #
-        textureW = aims.TimeTexture_FLOAT()
-        tex1 = textureW[0] # First Time sample
-        tex1.reserve(nnode)
-        for i in range(nnode): tex1.append( label[i] )
-        
-        W.write( textureW, tex_labels_name)
-    """
+        tio.Texture('', data=label).write(tex_labels_name)
     return LR, bf
     
 
@@ -261,9 +228,10 @@ texfun = [op.join(datadir,"%s/fct/glm/default/Contrast/left_computation-sentence
 #meshes = [op.join(datadir,"s%s/surf/lh.white.gii" %s) for s in subj_id]
 meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
+contrast_id = 'left_computation-sentences'
 
-AF,BF = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
-                         thq, swd)
+LR, BF = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
+                         thq, swd, contrast_id)
 
 
 
