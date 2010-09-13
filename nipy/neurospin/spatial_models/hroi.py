@@ -17,21 +17,36 @@ from nipy.neurospin.graph.forest import Forest
 from nipy.neurospin.spatial_models.mroi import SubDomains
 from nipy.neurospin.graph.field import field_from_coo_matrix_and_data
 
-def HROI_as_discrete_domain_blobs(dom, data, threshold=-np.infty, smin=0,
+def HROI_as_discrete_domain_blobs(domain, data, threshold=-np.infty, smin=0,
                                   id=''):
     """
+    Instantiate an HierarchicalROI as the blob decomposition
+    of a certain dataset
+    
+    Parameters  
+    ----------
+    domain: discrete_domain.StructuredDomain instance,
+            definition of the spatial context
+    data: array of shape (domain.size),
+          the corresponding data field
+    threshold: float optional,
+               thresholding level
+    
+    Returns
+    -------
+    the HierachicalROI instance
     """
     if threshold > data.max():
         label = -np.ones(data.shape)
         parents = np.array([])
-        return HierarchicalROI(dom, label, parents, id=id)
+        return HierarchicalROI(domain, label, parents, id=id)
     
     # check size
-    df = field_from_coo_matrix_and_data(dom.topology, data)
+    df = field_from_coo_matrix_and_data(domain.topology, data)
     idx, height, parents, label = df.threshold_bifurcations(th=threshold)    
     k = np.size(idx)
 
-    nroi = HierarchicalROI(dom, label, parents, id=id)
+    nroi = HierarchicalROI(domain, label, parents, id=id)
 
     # Create a signal feature
     nroi.make_feature('signal', np.reshape(data, (np.size(data), 1)))
