@@ -225,8 +225,8 @@ meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'left_computation-sentences'
 
-LR, bf = make_surface_BSA(meshes, texfun, texlat, texlon, theta, smin, ths,
-                         thq, swd, contrast_id)
+LR, bf = make_surface_BSA(
+    meshes, texfun, texlat, texlon, theta, ths, thq, smin, swd, contrast_id)
 
 
 
