@@ -208,22 +208,19 @@ class ENN(object):
         for a fraction of the data
 
         Parameters
-        -----------
+        ----------
         left : float, optional
             Left cut parameter to prevent fitting non-gaussian data         
         right : float, optional 
             Right cut parameter to prevent fitting non-gaussian data
 
-        Notes
-        ------
-
+        Note
+        ----
         This method stores the following attributes:
-         * mu = mu
-         * p0 = min(1, np.exp(lp0))
-         * sqsigma : standard deviation of the estimated normal
-           distribution
-         * sigma = np.sqrt(sqsigma) : variance of the estimated
-           normal distribution
+        self.mu = mean of the estimated nirmal mode
+        self.p0 = proportion of the estimated normal mode
+        self.sqsigma: standard deviation of the estimated normal mode
+        self.sigma: variance of the estimated normal mode
         """
         # take a central subsample of x
         x = self.x[int(self.n*left):int(self.n*right)]
@@ -263,8 +260,13 @@ class ENN(object):
         if self.learned==0:
             self.learn()
         efp = ( self.p0*st.norm.sf(self.x, self.mu, self.sigma)
-               *self.n/np.arange(self.n,0,-1))
+               *self.n/np.arange(self.n, 0, -1))
         efp = np.minimum(efp, 1)
+        ix = np.argsort(self.x)
+        for i in range(np.size(efp)-1, 0, -1):
+            efp[ix[i-1]] = np.maximum(efp[ix[i]], efp[ix[i-1]])
+        self.sorted_x = self.x[ix]
+        self.sorted_fdr = efp[ix]
         return efp
 
     def threshold(self, alpha=0.05, verbose=0):
@@ -319,16 +321,41 @@ class ENN(object):
             self.plot()
         return threshold
 
-    def fdr(self,theta):
+    def fdr(self, theta):
+        """given a threshold theta, find the estimated fdr
+
+        Parameter
+        ---------
+        theta: float or array of shape (n_samples)
+               values to test
+
+        Returns
+        -------
+        afp: value of array of shape(n)
         """
-        given a threshold theta, find the estimated fdr
-        """
-        import scipy.stats as st
-        if self.learned==0:
-            self.learn()
-        efp = self.p0*st.norm.sf(theta,self.mu,self.sigma)\
-              *float(self.n)/np.sum(self.x>theta)
-        efp = np.minimum(efp,1)
+        from scipy.stats import norm
+        #if self.learned==0:
+        #    self.learn()
+        self.fdrcurve()
+        if np.isscalar(theta):
+            if theta > self.sorted_x[-1]:
+                return 0
+            maj = np.where(self.sorted_x >= theta)[0][0]
+            efp = (self.p0 * norm.sf(theta, self.mu, self.sigma) * self.n\
+                  / np.sum(self.x >= theta))
+            efp = np.maximum(self.sorted_fdr[maj], efp)
+        else:
+            efp = []
+            for th in theta:
+                if th > self.sorted_x[-1]:
+                    efp.append(0)
+                    continue
+                maj = self.sorted_fdr[np.where(self.sorted_x >= th)[0][0]]
+                efp.append(np.maximum(maj, self.p0*st.norm.sf(th, self.mu,
+                           self.sigma)*self.n/np.sum(self.x >= th)))
+            efp = np.array(efp)
+            #
+        efp = np.minimum(efp, 1)
         return efp
 
     def plot(self, efp=None, alpha=0.05, bar=1, mpaxes=None):

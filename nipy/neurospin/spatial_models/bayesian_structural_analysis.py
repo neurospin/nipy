@@ -116,13 +116,13 @@ def _relabel_(label, nl=None):
 
 def signal_to_pproba(test, learn=None, method='prior', alpha=0.01, verbose=0):
     """
-    Convert a set of z-values to posterior probabilities of being active
+    Convert a set of z-values to posterior probabilities of not being active
 
     Parameters
     ----------
-    test: array pf shape(n_samples, 1),
+    test: array pf shape(n_samples),
            data that is assessed
-    learn: array pf shape(n_samples, 1), optional
+    learn: array pf shape(n_samples), optional
            data to learn a mixture model
     method: string, optional, to be chosen within
             ['gauss_mixture', 'emp_null', 'gam_gauss', 'prior']
@@ -139,7 +139,7 @@ def signal_to_pproba(test, learn=None, method='prior', alpha=0.01, verbose=0):
     elif method== 'emp_null':
         enn = en.ENN(learn)
         enn.learn()
-        bf0 = np.reshape(enn.fdr(test),np.size(bf0))
+        bf0 = np.reshape(enn.fdr(test),np.size(test))
     elif method=='gam_gauss':
         bfp  = en.Gamma_Gaussian_fit(learn, test, verbose)
         bf0 = bfp[:,1]
