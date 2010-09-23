@@ -379,8 +379,14 @@ def domain_from_mesh(mesh):
     else:
         mesh_ = mesh
         
-    cor, tri = mesh_.darrays
-    mesh_dom = MeshDomain( cor.data, tri.data)
+    if len(mesh_.darrays) == 2:
+        cor, tri = mesh_.darrays
+    elif len(mesh_.darrays) == 3:
+        cor, nor, tri = mesh_.darrays
+    else:
+        raise Exception("%d arrays in gifti file (case not handled)" \
+                        %len(mesh_.darrays))
+    mesh_dom = MeshDomain(cor.data, tri.data)
 
     vol = mesh_dom.area()
     coord = cor.data
