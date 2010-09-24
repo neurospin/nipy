@@ -4,7 +4,7 @@ import os.path as op
 
 import parietal.surface_operations.mesh_processing as mep
 
-from gifti import loadImage
+#from gifti import loadImage
 # to be replaced with nibabel.gifti
 
 import nipy.neurospin.glm_files_layout.tio as tio
@@ -28,7 +28,7 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
        let nr be the number of terminal regions across subjects
     gf0, array of shape (nr)
          the mixture-based prior probability 
-         that the terminal regions are true positives
+         that the terminal regions are false positives
     sub, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
@@ -67,7 +67,7 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     gf0 = np.concatenate(gf0)
 
     # launch the VMM
-    precision = 500.
+    precision = 200.
     #vmm = select_vmm(range(10, 40, 5 ), precision, True, gfc)
     vmm = select_vmm_cv(range(10, 40, 5), precision, True, gfc, sub)
     if verbose:

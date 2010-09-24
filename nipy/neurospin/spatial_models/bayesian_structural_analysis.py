@@ -181,7 +181,7 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
        let nr be the number of terminal regions across subjects
     gf0, array of shape (nr)
          the mixture-based prior probability 
-         that the terminal regions are true positives
+         that the terminal regions are false positives
     sub, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
@@ -406,7 +406,7 @@ def bsa_dpmm2(bf, gf0, sub, gfc, dmax, thq, ths, verbose):
        let nr be the number of terminal regions across subjects
     gf0, array of shape (nr)
          the mixture-based prior probability 
-         that the terminal regions are true positives
+         that the terminal regions are false positives
     sub, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
