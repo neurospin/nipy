@@ -178,7 +178,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     lbeta = np.array(lbeta).T
     bf, gf0, sub, gfc = bsa.compute_individual_regions (
         mesh_dom, lbeta, smin, theta, method='prior')
-
+    stop
     verbose = 1
     crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
@@ -206,13 +206,13 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     
 
 
-theta = 3.5
+theta = 2.5
 dmax = 10.
 ths = 2
-smin = 10
+smin = 5
 thq = 0.9
 
-subj_id = [ 's12069',  's12300',  's12370',  's12405',  's12432',  's12539',  's12635',  's12913',  's12081',  's12344',  's12381',  's12414',  's12508',  's12562',  's12636',  's12919',  's12165',  's12352',  's12401',  's12431',  's12532',  's12590',  's12898',  's12920'] [:10]
+subj_id = [ 's12069',  's12300',  's12370',  's12405',  's12432',  's12539',  's12635',  's12913',  's12081',  's12344',  's12381',  's12414',  's12508',  's12562',  's12636',  's12919',  's12165',  's12352',  's12401',  's12431',  's12532',  's12590',  's12898',  's12920']
 nbsubj = len(subj_id)
 datadir = "/data/thirion/virgile_internship_light/"
 texlat = [op.join(datadir,"sphere/ico100_7_lat.tex") for s in subj_id]

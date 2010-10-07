@@ -119,7 +119,7 @@ class VonMisesMixture(object):
         m = np.dot(z.T, x)
         self.means = (m.T/np.sqrt(np.sum(m**2,1))).T
 
-    def estimate(self, x, maxiter=100, miniter=1):
+    def estimate(self, x, maxiter=100, miniter=1, bias=None):
         """
         Parameters
         ----------
@@ -129,6 +129,7 @@ class VonMisesMixture(object):
                  maximum number of iterations of the algorithms
         miniter=1: int, optional,
                  minimum number of iterations
+                 
         Return
         ------
         ll: float, average (across samples) log-likelihood 
@@ -199,33 +200,37 @@ class VonMisesMixture(object):
             
         pylab.show()
 
-def estimate_robust_vmm(k, precision, null_class, x, ninit=10, maxiter=100):
+def estimate_robust_vmm(k, precision, null_class, x, ninit=10, bias=None,
+                        maxiter=100):
     """
     return the best von_mises mixture after severla initialization
     
     Parameters
     ----------
     k: int, number of classes
-    precision:
-    null class:
+    precision: float, priori precision parameter
+    null class: bool, optional,
+                should a null class be included or not 
     x: array fo shape(n,3)
-       should be on the unit sphere
-    k: int, optional
+       input data, should be on the unit sphere
     ninit: int, optional,
            number of iterations
+    bias: array of shape(n), optional
+          prior probability of being in a non-null class
     maxiter: int, optional,
              maximum number of iterations after each initialization
     """
     score = -np.infty
     for i in range(ninit):
-        aux = VonMisesMixture(k, precision, null_class=null_class)
+        aux = VonMisesMixture(k, precision, null_class, bias)
         ll = aux.estimate(x)
         if ll>score:
             best_model = aux
             score = ll
     return best_model
 
-def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
+def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
+               maxiter=100):
     """
     return the best von_mises mixture after severla initialization
     
@@ -240,6 +245,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
     ninit: int, optional,
            number of iterations
     maxiter: int, optional,
+    bias: array of shape(n)
     """
     score = -np.infty
     for k in krange:
@@ -256,7 +262,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, maxiter=100):
     return best_model
 
 def select_vmm_cv(krange, precision, null_class, x, cv_index,
-                  ninit=5, maxiter=100, verbose=0):
+                  ninit=5, maxiter=100, bias=None, verbose=0):
     """
     return the best von_mises mixture after severla initialization
     
@@ -272,6 +278,7 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
     ninit: int, optional,
            number of iterations
     maxiter: int, optional,
+    bias: array of shape (n), prior
     """
     score = -np.infty
     n_folds = len(np.unique(cv_index))
@@ -288,9 +295,9 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
                 ll[cv_index==i] = np.log(aux.mixture_likelihood(xt))
             if ll.mean() > mll[-1]:
                 mll[-1] = ll.mean()
-                
+            
         aux = estimate_robust_vmm(k, precision, null_class, x,
-                                  ninit, maxiter)
+                                  ninit, bias, maxiter)
         #print len(np.unique(np.argmax(aux.responsibilities(x), 1)))
 
         print k, mll[-1]
