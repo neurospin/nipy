@@ -129,7 +129,9 @@ class VonMisesMixture(object):
                  maximum number of iterations of the algorithms
         miniter=1: int, optional,
                  minimum number of iterations
-                 
+        bias: array of shape(n), optional
+              prior probability of being in a non-null class
+
         Return
         ------
         ll: float, average (across samples) log-likelihood 
@@ -149,6 +151,13 @@ class VonMisesMixture(object):
         for i in range(maxiter):
             ll = np.log(self.mixture_likelihood(x)).mean()
             z = self.responsibilities(x)
+            
+            # bias z
+            if bias is not None:
+                z[:, 0] *= (1-bias)
+                z[:, 1:] = ((z[:, 1:].T)*bias).T
+                z = (z.T/np.sum(z, 1)).T
+            
             self.estimate_weights(z)
             if self.null_class:
                 self.estimate_means(x, z[:, 1:])
@@ -222,8 +231,8 @@ def estimate_robust_vmm(k, precision, null_class, x, ninit=10, bias=None,
     """
     score = -np.infty
     for i in range(ninit):
-        aux = VonMisesMixture(k, precision, null_class, bias)
-        ll = aux.estimate(x)
+        aux = VonMisesMixture(k, precision, null_class=null_class)
+        ll = aux.estimate(x, bias=bias)
         if ll>score:
             best_model = aux
             score = ll
@@ -249,7 +258,8 @@ def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
     """
     score = -np.infty
     for k in krange:
-        aux = estimate_robust_vmm(k, precision, null_class, x, ninit, maxiter)
+        aux = estimate_robust_vmm(k, precision, null_class, x, ninit, bias, 
+                                  maxiter)
         ll = aux.estimate(x)
         if null_class:
             bic = ll-np.log(x.shape[0])*k*3/x.shape[0]
@@ -290,14 +300,16 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
             for i in np.unique(cv_index):
                 xl = x[cv_index!=i]
                 xt = x[cv_index==i]
+                if bias is not None:
+                    bias_l = bias[cv_index!=i]
                 aux = estimate_robust_vmm(k, precision, null_class, xl,
-                                          1, maxiter)
+                                          ninit=1, bias=bias_l, maxiter=maxiter)
                 ll[cv_index==i] = np.log(aux.mixture_likelihood(xt))
             if ll.mean() > mll[-1]:
                 mll[-1] = ll.mean()
             
         aux = estimate_robust_vmm(k, precision, null_class, x,
-                                  ninit, bias, maxiter)
+                                  ninit, bias=bias, maxiter=maxiter)
         #print len(np.unique(np.argmax(aux.responsibilities(x), 1)))
 
         print k, mll[-1]

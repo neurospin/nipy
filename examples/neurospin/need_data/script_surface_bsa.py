@@ -65,11 +65,11 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     sub = np.concatenate(sub).astype(np.int) 
     gfc = np.concatenate(gfc)
     gf0 = np.concatenate(gf0)
-
+    
     # launch the VMM
     precision = 200.
     #vmm = select_vmm(range(10, 40, 5 ), precision, True, gfc)
-    vmm = select_vmm_cv(range(10, 40, 5), precision, True, gfc, sub)
+    vmm = select_vmm_cv(range(10, 40, 5), precision, True, gfc, sub, bias=1-gf0)
     if verbose:
         vmm.show(gfc)
 
@@ -172,13 +172,11 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         #import Texture
         functional_data = tio.Texture(texfun[s]).read(texfun[s]).data
         #functional_data = np.random.randn(mesh_dom.size)
-        
         lbeta.append(functional_data)
         
     lbeta = np.array(lbeta).T
     bf, gf0, sub, gfc = bsa.compute_individual_regions (
         mesh_dom, lbeta, smin, theta, method='prior')
-    stop
     verbose = 1
     crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
@@ -228,30 +226,3 @@ contrast_id = 'left_computation-sentences'
 LR, bf = make_surface_BSA(
     meshes, texfun, texlat, texlon, theta, ths, thq, smin, swd, contrast_id)
 
-
-
-"""
-subj_id = [ '12069', '12081', '12165', '12207','12300','12344',
-             '12352', '12370', '12381', '12401', '12405', '12414',
-             '12431', '12432', '12508', '12532', '12539', '12562',
-             '12590' ]
-nbsubj = len(subj_id)
-datadir = "/home/at215559/alanpmad/subjfreesurfer/"
-texlat = [op.join(datadir,"ico100_7_lat.tex") for s in subj_id]
-texlon = [op.join(datadir,"ico100_7_lon.tex") for s in subj_id]
-
-
-# left hemisphere
-texfun = [[op.join(datadir,"s%s/fct/loc1/L_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
-meshes = [op.join(datadir,"average_brain/lh.average_brain.mesh") for s in subj_id]
-swd = "/tmp/freesurfer/left/"
-
-AF,bf = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
-
-# right hemisphere
-texfun = [[op.join(datadir,"s%s/fct/loc1/R_spmT_%04d.tex") % (s,b) for b in nbeta] for s in subj_id]
-meshes = [op.join(datadir,"average_brain/rh.average_brain.mesh") for s in subj_id]
-swd = "/tmp/freesurfer/right/"
-
-AF,bf = make_surface_BSA(meshes, texfun,texlat,texlon, theta,smin,ths,thq, dmax, swd,nbeta=nbeta)
-"""
