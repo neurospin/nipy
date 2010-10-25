@@ -2,11 +2,6 @@
 import numpy as	 np
 import os.path as op
 
-import parietal.surface_operations.mesh_processing as mep
-
-#from gifti import loadImage
-# to be replaced with nibabel.gifti
-
 import nipy.neurospin.glm_files_layout.tio as tio
 
 from nipy.neurospin.spatial_models.discrete_domain import domain_from_mesh
