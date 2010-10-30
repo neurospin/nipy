@@ -5,11 +5,11 @@ This module conatins a function to produce a dataset which simulates
 a collection of 2D images This dataset is saved as a 3D image
 (each slice being a subject) and a 3D array
 
-example of use: surrogate_2d_dataset(nbsubj=1,fid="/tmp/toto.dat",verbose=1)
+example of use: surrogate_2d_dataset(nbsubj=1, fid="/tmp/toto.dat", verbose=1)
 
 todo: rewrite it as a class
 
-Author : Bertrand Thirion, 2008-2009
+Author : Bertrand Thirion, 2008-2010
 """
 
 import numpy as np
@@ -152,10 +152,10 @@ def surrogate_2d_dataset(nbsubj=10, dimx=30, dimy=30, sk=1.0,
 
 
 def surrogate_3d_dataset(nbsubj=1, shape=(20,20,20), mask=None,
-                            sk=1.0, noise_level=1.0, pos=None, ampli=None,
-                            spatial_jitter=1.0, signal_jitter=1.0,
-                            width=5.0, out_text_file=None, out_image_file=None, 
-                            verbose=False, seed=False):
+                         sk=1.0, noise_level=1.0, pos=None, ampli=None,
+                         spatial_jitter=1.0, signal_jitter=1.0,
+                         width=5.0, out_text_file=None, out_image_file=None, 
+                         verbose=False, seed=False):
     """
     Create surrogate (simulated) 3D activation data with spatial noise.
 
@@ -166,7 +166,7 @@ def surrogate_3d_dataset(nbsubj=1, shape=(20,20,20), mask=None,
         generated.
     shape=(20,20,20): tuple of integers,
          the shape of each image
-    mask=None: brifti image instance,
+    mask=None: Nifti1Image instance,
         referential- and mask- defining image (overrides shape)
     sk: float, optionnal
         Amount of spatial noise smoothness.
@@ -220,11 +220,13 @@ def surrogate_3d_dataset(nbsubj=1, shape=(20,20,20), mask=None,
     # make the signal
     for s in range(nbsubj):
         data = np.zeros(shape)
+        lampli = []
         if pos !=None:
             if len(pos)!=len(ampli):
                 raise ValueError, 'ampli and pos do not have the same len'
             lpos = pos + spatial_jitter*nr.randn(1, 3)
             lampli = ampli + signal_jitter*nr.randn(np.size(ampli))
+        
         for k in range(np.size(lampli)):
             data = np.maximum(data,_cone3d(shape, ijk, lpos[k], lampli[k],
                                            width))
@@ -249,6 +251,8 @@ def surrogate_3d_dataset(nbsubj=1, shape=(20,20,20), mask=None,
         mp.colorbar()
 
     dataset = np.array(dataset)
+    if nbsubj==1:
+        dataset = dataset[0]
 
     if out_text_file is not None: 
         dataset.tofile(out_text_file)
