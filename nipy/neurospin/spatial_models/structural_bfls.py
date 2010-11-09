@@ -274,7 +274,7 @@ class LandmarkRegions(object):
         else:
             for j in range(self.k):
                 subjj = subj[j]
-                conf = self.get_features(fid)[j]
+                conf = self.get_feature(fid)[j]
                 mp = 0.
                 vp = 0.
                 for ls in np.unique(subjj):
@@ -377,10 +377,6 @@ def build_LR(bf, thq=0.95, ths=0, dmax=1., verbose=0):
     newlabel: a relabelling of the individual ROIs, similar to u,
               which discards
               labels that do not fulfill the condition (c)
-
-    Fixme
-    -----
-    Should be merged with sbf.build_LR
     """
     dim = bf[0].domain.em_dim
     
@@ -421,7 +417,7 @@ def build_LR(bf, thq=0.95, ths=0, dmax=1., verbose=0):
 
         # if above threshold, get some information to create the LR
         if verbose:
-            print i, valid.sum(), ths, mp, thq
+            print 'lr', i, valid.sum(), ths, mp, thq
 
         if stats.norm.sf(ths, mp, np.sqrt(vp))>thq:         
             sj = np.size(subjj)

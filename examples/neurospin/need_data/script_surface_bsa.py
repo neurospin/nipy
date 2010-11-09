@@ -62,16 +62,18 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     gf0 = np.concatenate(gf0)
     
     # launch the VMM
-    precision = 200.
-    #vmm = select_vmm(range(10, 40, 5 ), precision, True, gfc)
-    vmm = select_vmm_cv(range(10, 40, 5), precision, True, gfc, sub, bias=1-gf0)
+    precision = 100.
+    #vmm = select_vmm(range(10, 100, 10 ), precision, gfc, True)
+    vmm = select_vmm_cv(range(10, 50, 5), precision, gfc, null_class=True,  
+                        cv_index=sub, bias=1-gf0)
     if verbose:
         vmm.show(gfc)
 
-    print vmm.k
+    p = vmm.mixture_density(dom.coord)
     z = vmm.responsibilities(gfc)    
     label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
-    
+    print 'number of components', len(np.unique(label))
+
     # append some information to the hroi in each subject
     for s in range(n_subj):
         bfs = bf[s]
@@ -94,13 +96,13 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
             # when parent regions has similarly labelled children,
             # include it also
             us = bfs.make_forest().propagate_upward(us)
-            bfs.set_roi_feature('label',us)
+            bfs.set_roi_feature('label', us)
                         
     # derive the group-level landmarks
     # with a threshold on the number of subjects
     # that are represented in each one 
-    LR, nl = sbf.build_LR(bf, thq, ths, dmax, verbose=verbose)
-
+    LR, nl = sbf.build_LR(bf, thq, ths, dmax, verbose=1)
+    
     # make a group-level map of the landmark position        
     crmap = bsa._relabel_(label, nl)   
     return crmap, LR, bf, p
@@ -140,30 +142,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     mesh_doms = []
     lbeta = []
     for s in range(nbsubj):
-        
-        """
-        # this is for subject-specific domains
-        mesh_dom = domain_from_mesh(meshes[s])
-        
-        #import Mesh
-        mesh = loadImage(meshes[s])
-        vertices = mesh.getArrays()[0].getData()
-
-        ## get the surface-based coordinates
-        #latitude = tio.Texture(texlat[s]).read(texlat[s]).data
-        #latitude = latitude-latitude.min()
-        #longitude = tio.Texture(texlat[s]).read(texlon[s]).data
-        #print latitude.min(),latitude.max(),longitude.min(),longitude.max()
-        latitude = np.random.rand(vertices.shape[0]) * 2  * np.pi
-        longitude = np.random.rand(vertices.shape[0]) * np.pi
-        lcoord = r0*np.vstack((np.sin(latitude) * np.cos(longitude),
-                               np.sin(latitude) * np.sin(longitude),
-                               np.cos(latitude))).T
-        
-        mesh_dom.coord = lcoord
-        mesh_doms.append(mesh_dom)
-        """
-        
+        # possibly create here subject-specific domain
         #import Texture
         functional_data = tio.Texture(texfun[s]).read(texfun[s]).data
         #functional_data = np.random.randn(mesh_dom.size)
@@ -172,11 +151,11 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     lbeta = np.array(lbeta).T
     bf, gf0, sub, gfc = bsa.compute_individual_regions (
         mesh_dom, lbeta, smin, theta, method='prior')
-    verbose = 1
+    verbose = 0
     crmap, LR, bf, p = bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose)
     
     if LR!=None:
-        defindex = LR.k+2
+        defindex = LR.k + 2
     else:
         defindex = 0
     
@@ -187,7 +166,6 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     #write the corresponding density
     tex_labels_name = op.join(swd, "density_%s.tex" % contrast_id) 
     tio.Texture('', data=p).write(tex_labels_name)
-    
     for s in range(nbsubj):
         tex_labels_name = op.join(swd,"AR_s%04d_%s.tex" % (s, contrast_id))
         label = -np.ones(mesh_dom.size, 'int32')
@@ -201,7 +179,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
 
 theta = 2.5
 dmax = 10.
-ths = 2
+ths = 5
 smin = 5
 thq = 0.9
 
@@ -218,6 +196,6 @@ meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'left_computation-sentences'
 
-LR, bf = make_surface_BSA(
+lr, bf = make_surface_BSA(
     meshes, texfun, texlat, texlon, theta, ths, thq, smin, swd, contrast_id)
 

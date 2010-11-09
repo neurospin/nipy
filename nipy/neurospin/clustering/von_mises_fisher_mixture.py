@@ -36,9 +36,9 @@ class VonMisesMixture(object):
         self.null_class = null_class
         
 
-    def likelihood_per_component(self, x):
+    def density_per_component(self, x):
         """
-        Compute the per-component likelihood of the data
+        Compute the per-component density of the data
 
         Parameters
         ----------
@@ -48,7 +48,7 @@ class VonMisesMixture(object):
         Returns
         -------
         like: array of shape(n, self.k), with non-neagtive values
-              the likelihood
+              the density
         """
         n = x.shape[0]
         constant = self.precision / (2*np.pi*(1-np.exp(-2*self.precision)))
@@ -59,7 +59,7 @@ class VonMisesMixture(object):
             like = np.hstack((1./(4*np.pi)*np.ones((n, 1)), like))
         return like
 
-    def weighted_likelihood(self, x):
+    def weighted_density(self, x):
         """
         Parameters
         ----------
@@ -70,9 +70,9 @@ class VonMisesMixture(object):
         -------
         like: array of shape(n, self.k)
         """
-        return(self.likelihood_per_component(x)*self.weights)
+        return(self.density_per_component(x)*self.weights)
 
-    def mixture_likelihood(self, x):
+    def mixture_density(self, x):
         """
         Parameters
         ----------
@@ -83,7 +83,7 @@ class VonMisesMixture(object):
         -------
         like: array of shape(n)   
         """
-        wl = self.weighted_likelihood(x)
+        wl = self.weighted_density(x)
         return np.sum(wl, 1)
 
     def responsibilities(self, x):
@@ -97,7 +97,7 @@ class VonMisesMixture(object):
         -------
         resp: array of shape(n, self.k)
         """
-        wl = self.weighted_likelihood(x)
+        wl = self.weighted_density(x)
         return (wl.T/np.sum(wl, 1)).T
 
     def estimate_weights(self, z):
@@ -134,7 +134,7 @@ class VonMisesMixture(object):
 
         Return
         ------
-        ll: float, average (across samples) log-likelihood 
+        ll: float, average (across samples) log-density 
         """
         # initialization with random positions and constant weights
         if self.weights is None:
@@ -149,7 +149,7 @@ class VonMisesMixture(object):
 
         # EM algorithm
         for i in range(maxiter):
-            ll = np.log(self.mixture_likelihood(x)).mean()
+            ll = np.log(self.mixture_density(x)).mean()
             z = self.responsibilities(x)
             
             # bias z
@@ -271,7 +271,7 @@ def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
             score = bic
     return best_model
 
-def select_vmm_cv(krange, precision, null_class, x, cv_index,
+def select_vmm_cv(krange, precision, x, null_class, cv_index,
                   ninit=5, maxiter=100, bias=None, verbose=0):
     """
     return the best von_mises mixture after severla initialization
@@ -280,11 +280,12 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
     ----------
     krange: list of ints,
             number of classes to consider
-    precision:
-    null class:
+    precision: float,
+               precision parameter of the von-mises densities
     x: array fo shape(n,3)
        should be on the unit sphere
-    cv_ndex: set of indices for cross validation
+    null class: bool, whether a null class should be included or not 
+    cv_index: set of indices for cross validation
     ninit: int, optional,
            number of iterations
     maxiter: int, optional,
@@ -300,18 +301,18 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
             for i in np.unique(cv_index):
                 xl = x[cv_index!=i]
                 xt = x[cv_index==i]
+                bias_l = None
                 if bias is not None:
                     bias_l = bias[cv_index!=i]
                 aux = estimate_robust_vmm(k, precision, null_class, xl,
                                           ninit=1, bias=bias_l, maxiter=maxiter)
-                ll[cv_index==i] = np.log(aux.mixture_likelihood(xt))
+                ll[cv_index==i] = np.log(aux.mixture_density(xt))
             if ll.mean() > mll[-1]:
                 mll[-1] = ll.mean()
             
         aux = estimate_robust_vmm(k, precision, null_class, x,
                                   ninit, bias=bias, maxiter=maxiter)
-        #print len(np.unique(np.argmax(aux.responsibilities(x), 1)))
-
+        
         print k, mll[-1]
         if mll[-1]>score:
             best_model = aux
@@ -320,7 +321,7 @@ def select_vmm_cv(krange, precision, null_class, x, cv_index,
     if verbose:
         pylab.figure()
         pylab.plot(mll)
-        pylab.set_title('Cross-Validated likelihood as a function of k')
+        pylab.set_title('Cross-Validated density as a function of k')
 
     return best_model
 
@@ -345,7 +346,7 @@ def sphere_density(npoints):
            np.pi**2*2*1./(npoints**2)
     return s, area
 
-def example():
+def example_noisy():
     x1 = [0.6, 0.48, 0.64]
     x2 = [-0.8, 0.48, 0.36]
     x3 = [0.48, 0.64, -0.6]
@@ -365,4 +366,41 @@ def example():
     
     # check that it sums to 1
     s, area = sphere_density(100)
-    check_integral =  (vmm.mixture_likelihood(s)*area).sum()
+    check_integral =  (vmm.mixture_density(s)*area).sum()
+
+def example_no_noise():
+    x1 = [0.6, 0.48, 0.64]
+    x2 = [-0.8, 0.48, 0.36]
+    x3 = [0.48, 0.64, -0.6]
+    x = np.random.randn(200,3)*.1
+    x[:40] += x1
+    x[40:150] += x2
+    x[150:] += x3
+    x = (x.T/np.sqrt(np.sum(x**2,1))).T
+
+    precision = 100.
+    vmm = select_vmm(range(1,8), precision, False, x)
+    vmm.show(x)
+    
+    # check that it sums to 1
+    s, area = sphere_density(100)
+
+def example_cv_nonoise():
+    x1 = [0.6, 0.48, 0.64]
+    x2 = [-0.8, 0.48, 0.36]
+    x3 = [0.48, 0.64, -0.6]
+    x = np.random.randn(30, 3)*.1
+    x[0::3] += x1
+    x[1::3] += x2
+    x[2::3] += x3
+    x = (x.T/np.sqrt(np.sum(x**2,1))).T
+
+    precision = 50.
+    sub = np.repeat(np.arange(10), 3)
+    vmm = select_vmm_cv(range(1,8), precision, x, cv_index=sub, 
+                        null_class=False, ninit=20)
+    vmm.show(x)
+    
+    # check that it sums to 1
+    s, area = sphere_density(100)
+    return vmm
