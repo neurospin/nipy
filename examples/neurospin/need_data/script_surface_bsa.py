@@ -64,37 +64,43 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, verbose=0):
     # launch the VMM
     precision = 100.
     #vmm = select_vmm(range(10, 100, 10 ), precision, gfc, True)
-    vmm = select_vmm_cv(range(10, 50, 5), precision, gfc, null_class=True,  
-                        cv_index=sub, bias=1-gf0)
+    #vmm = select_vmm_cv(range(10, 50, 5), precision, gfc, null_class=False,  
+    #                    cv_index=sub, verbose=1)
+    #z = vmm.responsibilities(gfc)    
+    #label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
+    #print 'number of components', len(np.unique(label))
+    
+    vmm = select_vmm_cv(range(5, 50, 5), precision, gfc, null_class=True,  
+                        cv_index=sub, bias=1-gf0, verbose=1)
     if verbose:
         vmm.show(gfc)
 
-    p = vmm.mixture_density(dom.coord)
     z = vmm.responsibilities(gfc)    
     label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
     print 'number of components', len(np.unique(label))
+
+    p = vmm.mixture_density(dom.coord)
 
     # append some information to the hroi in each subject
     for s in range(n_subj):
         bfs = bf[s]
         if bfs.k>0 :
             leaves = bfs.isleaf()
-            us = -np.ones(bfs.k).astype(np.int)
-
-            # set posterior proba
-            lq = np.zeros(bfs.k)
-            lq[leaves] = 1-z[sub==s, 0]
-            bfs.set_roi_feature('posterior_proba', lq)
-
+            
             # set prior proba
             lq = np.zeros(bfs.k)
             lq[leaves] = 1-gf0[sub==s]
             bfs.set_roi_feature('prior_proba', lq)
-
-            us[leaves] = z[sub==s].argmax(1)-1
+            
+            # set posterior proba
+            lq = np.zeros(bfs.k)
+            lq[leaves] = 1-z[sub==s, 0]
+            bfs.set_roi_feature('posterior_proba', lq)
             
             # when parent regions has similarly labelled children,
             # include it also
+            us = -np.ones(bfs.k).astype(np.int)
+            us[leaves] = z[sub==s].argmax(1)-1
             us = bfs.make_forest().propagate_upward(us)
             bfs.set_roi_feature('label', us)
                         
@@ -132,8 +138,6 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     latitude = latitude-latitude.min()
     longitude = tio.Texture('').read(texlon[0]).data
 
-    #latitude = np.random.rand(mesh_dom.size) * 2  * np.pi
-    #longitude = np.random.rand(mesh_dom.size) * np.pi
     coord = r0*np.vstack((np.sin(latitude) * np.cos(longitude),
                           np.sin(latitude) * np.sin(longitude),
                           np.cos(latitude))).T
@@ -191,8 +195,8 @@ texlon = [op.join(datadir,"sphere/ico100_7_lon.tex") for s in subj_id]
 
 # left hemisphere
 texfun = [op.join(datadir,"%s/fct/glm/default/Contrast/left_computation-sentences_z_map.tex"%s) for s in subj_id]
-#meshes = [op.join(datadir,"s%s/surf/lh.white.gii" %s) for s in subj_id]
-meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
+meshes = [op.join(datadir,"%s/surf/lh.r.aims.white.gii" %s) for s in subj_id]
+#meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'left_computation-sentences'
 

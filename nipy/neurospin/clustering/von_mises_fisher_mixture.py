@@ -1,4 +1,5 @@
 import numpy as np
+import pylab
 
 class VonMisesMixture(object):
     """
@@ -35,8 +36,7 @@ class VonMisesMixture(object):
         self.weights = weights
         self.null_class = null_class
         
-
-    def density_per_component(self, x):
+    def log_density_per_component(self, x):
         """
         Compute the per-component density of the data
 
@@ -52,12 +52,36 @@ class VonMisesMixture(object):
         """
         n = x.shape[0]
         constant = self.precision / (2*np.pi*(1-np.exp(-2*self.precision)))
-        
-        loglike = (np.dot(x, self.means.T)-1)*self.precision
-        like = constant*np.exp(loglike)
+        loglike = np.log(constant) + (np.dot(x, self.means.T)-1)*self.precision
         if self.null_class:
-            like = np.hstack((1./(4*np.pi)*np.ones((n, 1)), like))
-        return like
+            loglike = np.hstack((np.log(1./(4*np.pi))*np.ones((n, 1)), loglike))
+            
+        return loglike
+
+    def density_per_component(self, x):
+        """
+        Compute the per-component density of the data
+
+        Parameters
+        ----------
+        x: array fo shape(n,3)
+           should be on the unit sphere
+
+        Returns
+        -------
+        like: array of shape(n, self.k), with non-neagtive values
+              the density
+        """
+        #n = x.shape[0]
+        #constant = self.precision / (2*np.pi*(1-np.exp(-2*self.precision)))
+        # 
+        #loglike = (np.dot(x, self.means.T)-1)*self.precision
+        #like = constant*np.exp(loglike)
+        #if self.null_class:
+        #    like = np.hstack((1./(4*np.pi)*np.ones((n, 1)), like))
+        #    
+        #return like
+        return np.exp(self.log_density_per_component(x))
 
     def weighted_density(self, x):
         """
@@ -71,6 +95,19 @@ class VonMisesMixture(object):
         like: array of shape(n, self.k)
         """
         return(self.density_per_component(x)*self.weights)
+
+    def log_weighted_density(self, x):
+        """
+        Parameters
+        ----------
+        x: array fo shape(n,3)
+           should be on the unit sphere
+
+        Returns
+        -------
+        log_like: array of shape(n, self.k)
+        """
+        return(self.log_density_per_component(x) + np.log(self.weights))
 
     def mixture_density(self, x):
         """
@@ -97,8 +134,11 @@ class VonMisesMixture(object):
         -------
         resp: array of shape(n, self.k)
         """
-        wl = self.weighted_density(x)
-        return (wl.T/np.sum(wl, 1)).T
+        lwl = self.log_weighted_density(x)
+        wl = np.exp(lwl.T - lwl.mean(1)).T
+        swl = np.sum(wl, 1)
+        resp = (wl.T / swl).T
+        return resp 
 
     def estimate_weights(self, z):
         """
@@ -148,10 +188,12 @@ class VonMisesMixture(object):
             self.means = x[aux[:self.k]]
 
         # EM algorithm
+        assert not(np.isnan(self.means).any())
         for i in range(maxiter):
             ll = np.log(self.mixture_density(x)).mean()
             z = self.responsibilities(x)
-            
+            assert not(np.isnan(z).any())
+
             # bias z
             if bias is not None:
                 z[:, 0] *= (1-bias)
@@ -163,8 +205,9 @@ class VonMisesMixture(object):
                 self.estimate_means(x, z[:, 1:])
             else:
                 self.estimate_means(x, z)
-            if i>miniter:
-                if ll<pll+1.e-6:
+            assert not(np.isnan(self.means).any())
+            if i > miniter:
+                if ll < pll+1.e-6:
                     break
             pll = ll
         return ll
@@ -188,7 +231,7 @@ class VonMisesMixture(object):
         ax = p3.Axes3D(fig)
         colors = (['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']*(1+(1+self.k)/8))\
                  [:self.k+1]
-        if self.null_class:
+        if (self.null_class) and (z==0).any():
             ax.plot3D(x[z==0, 0], x[z==0, 1], x[z==0, 2],'.',
                       color=colors[0])
         for k in range(self.k):
@@ -239,7 +282,7 @@ def estimate_robust_vmm(k, precision, null_class, x, ninit=10, bias=None,
     return best_model
 
 def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
-               maxiter=100):
+               maxiter=100, verbose=0):
     """
     return the best von_mises mixture after severla initialization
     
@@ -254,7 +297,9 @@ def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
     ninit: int, optional,
            number of iterations
     maxiter: int, optional,
-    bias: array of shape(n)
+    bias: array of shape(n),
+          a prior probability of not being in the null class
+    verbose: Bool, optional
     """
     score = -np.infty
     for k in krange:
@@ -265,7 +310,8 @@ def select_vmm(krange, precision, null_class, x, ninit=10, bias=None,
             bic = ll-np.log(x.shape[0])*k*3/x.shape[0]
         else:
              bic = ll-np.log(x.shape[0])*(k*3-1)/x.shape[0]
-        print k, bic
+        if verbose:
+            print k, bic
         if bic>score:
             best_model = aux
             score = bic
@@ -296,33 +342,35 @@ def select_vmm_cv(krange, precision, x, null_class, cv_index,
     mll = []
     for k in krange:
         mll.append(-np.infty)
-        for j in range(ninit):
+        for j in range(1):
             ll = np.zeros_like(cv_index).astype(np.float)
             for i in np.unique(cv_index):
-                xl = x[cv_index!=i]
-                xt = x[cv_index==i]
+                xl = x[cv_index != i]
+                xt = x[cv_index == i]
                 bias_l = None
                 if bias is not None:
-                    bias_l = bias[cv_index!=i]
+                    bias_l = bias[cv_index != i]
                 aux = estimate_robust_vmm(k, precision, null_class, xl,
-                                          ninit=1, bias=bias_l, maxiter=maxiter)
-                ll[cv_index==i] = np.log(aux.mixture_density(xt))
+                                          ninit=ninit, bias=bias_l, 
+                                          maxiter=maxiter)
+                if bias is None:
+                    ll[cv_index==i] = np.log(aux.mixture_density(xt))
+                else:
+                    bias_t = bias[cv_index == i]
+                    lwd = aux.weighted_density(xt)
+                    ll[cv_index==i] = np.log(lwd[:, 0] * (1-bias_t) +  \
+                        lwd[:, 1:].sum(1) * bias_t)
             if ll.mean() > mll[-1]:
                 mll[-1] = ll.mean()
-            
+        
         aux = estimate_robust_vmm(k, precision, null_class, x,
                                   ninit, bias=bias, maxiter=maxiter)
         
-        print k, mll[-1]
+        if verbose: print k, mll[-1]
         if mll[-1]>score:
             best_model = aux
             score = mll[-1]
             
-    if verbose:
-        pylab.figure()
-        pylab.plot(mll)
-        pylab.set_title('Cross-Validated density as a function of k')
-
     return best_model
 
 
@@ -368,22 +416,7 @@ def example_noisy():
     s, area = sphere_density(100)
     check_integral =  (vmm.mixture_density(s)*area).sum()
 
-def example_no_noise():
-    x1 = [0.6, 0.48, 0.64]
-    x2 = [-0.8, 0.48, 0.36]
-    x3 = [0.48, 0.64, -0.6]
-    x = np.random.randn(200,3)*.1
-    x[:40] += x1
-    x[40:150] += x2
-    x[150:] += x3
-    x = (x.T/np.sqrt(np.sum(x**2,1))).T
 
-    precision = 100.
-    vmm = select_vmm(range(1,8), precision, False, x)
-    vmm.show(x)
-    
-    # check that it sums to 1
-    s, area = sphere_density(100)
 
 def example_cv_nonoise():
     x1 = [0.6, 0.48, 0.64]
@@ -393,7 +426,7 @@ def example_cv_nonoise():
     x[0::3] += x1
     x[1::3] += x2
     x[2::3] += x3
-    x = (x.T/np.sqrt(np.sum(x**2,1))).T
+    x = (x.T / np.sqrt(np.sum(x**2,1))).T
 
     precision = 50.
     sub = np.repeat(np.arange(10), 3)
