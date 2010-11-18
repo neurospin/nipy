@@ -10,7 +10,7 @@ Author : Bertrand Thirion, 2010
 # python testClustering.py Test_Clustering
 
 import numpy as np
-from numpy.testing import assert_almost_equal
+#from numpy.testing import assert_almost_equal
 
 import nipy.neurospin.clustering.von_mises_fisher_mixture as vmm
 
