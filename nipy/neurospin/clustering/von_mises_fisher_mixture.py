@@ -1,5 +1,4 @@
 import numpy as np
-import pylab
 
 class VonMisesMixture(object):
     """
@@ -178,9 +177,9 @@ class VonMisesMixture(object):
         """
         # initialization with random positions and constant weights
         if self.weights is None:
-            self.weights = np.ones(self.k)/self.k
+            self.weights = np.ones(self.k) / self.k
             if self.null_class:
-                self.weights = np.ones(self.k+1)/(self.k+1)
+                self.weights = np.ones(self.k + 1) / (self.k + 1)
                 
         if self.means is None:
             aux = np.arange(x.shape[0])
@@ -189,6 +188,7 @@ class VonMisesMixture(object):
 
         # EM algorithm
         assert not(np.isnan(self.means).any())
+        pll = - np.infty
         for i in range(maxiter):
             ll = np.log(self.mixture_density(x)).mean()
             z = self.responsibilities(x)
@@ -206,9 +206,8 @@ class VonMisesMixture(object):
             else:
                 self.estimate_means(x, z)
             assert not(np.isnan(self.means).any())
-            if i > miniter:
-                if ll < pll+1.e-6:
-                    break
+            if (i > miniter) and (ll < pll + 1.e-6):
+                break
             pll = ll
         return ll
             
@@ -338,7 +337,6 @@ def select_vmm_cv(krange, precision, x, null_class, cv_index,
     bias: array of shape (n), prior
     """
     score = -np.infty
-    n_folds = len(np.unique(cv_index))
     mll = []
     for k in krange:
         mll.append(-np.infty)
@@ -405,18 +403,13 @@ def example_noisy():
     x = (x.T/np.sqrt(np.sum(x**2,1))).T
 
     precision = 100.
-    k = 3
     vmm = select_vmm(range(2,7), precision, True, x)
-    #vmm = estimate_robust_vmm(k, precision, True, x)
-    #VonMisesMixture(k, precision, null_class=True)
-    #vmm.estimate(x)
     vmm.show(x)
     
     # check that it sums to 1
     s, area = sphere_density(100)
-    check_integral =  (vmm.mixture_density(s)*area).sum()
-
-
+    print (vmm.mixture_density(s)*area).sum()
+    
 
 def example_cv_nonoise():
     x1 = [0.6, 0.48, 0.64]
