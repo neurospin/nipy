@@ -1,4 +1,3 @@
-
 import numpy as	 np
 import os.path as op
 
@@ -11,28 +10,88 @@ from nipy.neurospin.clustering.von_mises_fisher_mixture import select_vmm_cv
 # from nipy.neurospin.clustering.von_mises_fisher_mixture import select_vmm
 
 
-def kernel_vmm_density(pos, bias, precision, domain):
+def kernel_vmm_density(pos, bias, precision, domain, fancy_init=True, 
+                       return_empirical=False):
     """ Define a density on the sphere through a vmm-kde approach
+    
+    Parameters
+    ----------
+    pos: array of shape(n_pos, 3)
+         the positions used in the density estimation
+    bias: array od shape (n)
+          the probability that the input data has to be accounted for
+    precision: float,
+               precision/scale parameter of the spatial density
+    domain: discrete_domain.domain instance,
+            the domain on which densities are sampled
+    fancy_init: bool, optional
+                if yes, the empirical density uses  2*precision 
+    return empirical: bool, optional,
+                      if True, the empriical density is returned            
     """
     from nipy.neurospin.clustering.von_mises_fisher_mixture import \
         VonMisesMixture
     from nipy.neurospin.graph.field import field_from_coo_matrix_and_data
 
-    weights = bias / bias.sum()
+    if bias is None:
+        null_class = False
+        weights = np.ones(pos.shape[0])/pos.shape[0]
+    else:
+        null_class = True
+        weights = bias / bias.sum()
     k = len(weights)
-    tmp = VonMisesMixture(k, 2*precision, means=pos, weights=weights)
+    # caveat: memory breaks if there is too much input data
+    if fancy_init:
+        tmp = VonMisesMixture(k, 2*precision, means=pos, weights=weights)
+    else:
+        tmp = VonMisesMixture(k, precision, means=pos, weights=weights)
+    
+    if return_empirical:
+        return tmp
+
     p = tmp.mixture_density(domain.coord)
     sphere_dens = field_from_coo_matrix_and_data(domain.topology, p)
     means = domain.coord[sphere_dens.local_maxima() > 0]
     k = means.shape[0]
-    weights = np.ones(k+1) / (k+1)
+    if null_class==True:
+        weights = np.ones(k+1) / (k+1)
+    else:
+         weights = np.ones(k) / k
     vmm = VonMisesMixture(k, precision, means=means, weights=weights, 
-                          null_class=True)
+                          null_class=null_class)
     vmm.estimate(pos, bias=bias)
     return vmm
 
+def cv_kernel_vmm_density(x, bias, precision, domain, cv_index):
+    """Evaluate the quality of a desnity model using cross-validation
+    """
+    score = -np.infty
+    mll = []
+    mll.append(-np.infty)
+    
+    ll = np.zeros_like(cv_index).astype(np.float)
+    for i in np.unique(cv_index):
+        xl = x[cv_index != i]
+        xt = x[cv_index == i]
+        bias_l = None
+        if bias is not None:
+            bias_l = bias[cv_index != i]
+        aux = kernel_vmm_density(xl, bias_l, precision, domain)
+        
+        if bias is None:
+            test_density = aux.mixture_density(xt)
+            ll[cv_index==i] = np.log(test_density)
+        else:
+            bias_t = bias[cv_index == i]
+            lwd = aux.weighted_density(xt)
+            ll[cv_index==i] = np.log(lwd[:, 0] * (1-bias_t) +  \
+                                         lwd[:, 1:].sum(1) * bias_t)
+    mll = ll.mean()
+    print mll
+    return mll
 
-def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
+
+def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
     """ Estimation of the population level model of activation density using
     dpmm and inference
 
@@ -44,7 +103,7 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
     gf0, array of shape (nr)
          the mixture-based prior probability
          that the terminal regions are false positives
-    sub, array of shape (nr)
+    subjects, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
          the coordinates of the of the terminal regions
@@ -73,10 +132,10 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
     crmap = - np.ones(dom.size, np.int)
     LR = None
     p = np.zeros(dom.size)
-    if len(sub) < 1:
+    if len(subjects) < 1:
         return crmap, LR, bf, p
 
-    sub = np.concatenate(sub).astype(np.int)
+    subjects = np.concatenate(subjects).astype(np.int)
     gfc = np.concatenate(gfc)
     gf0 = np.concatenate(gf0)
 
@@ -88,10 +147,16 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
     #z = vmm.responsibilities(gfc)
     #label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
     #print 'number of components', len(np.unique(label))
+
+    #cv_kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain, subjects)
+    #cv_kernel_vmm_density(gfc, None, precision, bf[0].domain, subjects)
+    #cv_kernel_vmm_density(gfc, 1-gf0, precision/2, bf[0].domain, subjects)
+    #cv_kernel_vmm_density(gfc, None, precision/2, bf[0].domain, subjects)
+
     vmm = kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain)
     
     #vmm = select_vmm_cv(range(5, 50, 5), precision, gfc, null_class=True,
-    #                    cv_index=sub, bias=1 - gf0, verbose=1)
+    #                    cv_index=subjects, bias=1 - gf0, verbose=1)
     
     if verbose:
         vmm.show(gfc)
@@ -101,6 +166,18 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
     print 'number of components', len(np.unique(label))
 
     p = vmm.mixture_density(dom.coord)
+    
+
+    def _weighted_prevalence(vmm, bias, coord, gfc):
+        """Evaluation of a prevalence density
+        """
+        dens = vmm.density_per_component(coord)[:, 1:]
+        label = np.argmax(vmm.responsibilities(gfc), 1)
+        # does not take into account subject information
+        weight = np.array([np.sum(bias[label==k]) for k in range(1, vmm.k+1)])
+        return np.dot(dens, weight)
+    
+    wp = _weighted_prevalence(vmm, 1-gf0, dom.coord, gfc)
 
     # append some information to the hroi in each subject
     for s in range(n_subj):
@@ -110,18 +187,18 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
             
             # set prior proba
             lq = np.zeros(bfs.k)
-            lq[leaves] = 1 - gf0[sub == s]
+            lq[leaves] = 1 - gf0[subjects == s]
             bfs.set_roi_feature('prior_proba', lq)
             
             # set posterior proba
             lq = np.zeros(bfs.k)
-            lq[leaves] = 1 - z[sub == s, 0]
+            lq[leaves] = 1 - z[subjects == s, 0]
             bfs.set_roi_feature('posterior_proba', lq)
             
             # when parent regions has similarly labelled children,
             # include it also
             us = - np.ones(bfs.k).astype(np.int)
-            us[leaves] = z[sub == s].argmax(1) - 1
+            us[leaves] = z[subjects == s].argmax(1) - 1
             us = bfs.make_forest().propagate_upward(us)
             bfs.set_roi_feature('label', us)
                         
@@ -132,7 +209,7 @@ def bsa_vmm(bf, gf0, sub, gfc, dmax, thq, ths, precision=100, verbose=0):
     
     # make a group-level map of the landmark position        
     crmap = bsa._relabel_(label, nl).astype(np.int)   
-    return crmap, LR, bf, p
+    return crmap, LR, bf, wp
 
 
 def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
@@ -171,9 +248,11 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         lbeta.append(functional_data)
         
     lbeta = np.array(lbeta).T
+
     bf, gf0, sub, gfc = bsa.compute_individual_regions(
         mesh_dom, lbeta, smin, theta, method='prior')
     verbose = 1
+    
     crmap, LR, bf, p = bsa_vmm(
         bf, gf0, sub, gfc, dmax, thq, ths, precision, verbose)
     
@@ -181,16 +260,21 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     tex_labels_name = op.join(swd, "CR_%s.tex" % contrast_id)
     tio.Texture('', data=crmap.astype(np.int32)).write(tex_labels_name)
     
-    # write the corresponding density
-    tex_labels_name = op.join(swd, "density_%s.tex" % contrast_id) 
-    tio.Texture('', data=p).write(tex_labels_name)
+    ## write the corresponding density
+    #tex_labels_name = op.join(swd, "density_%s.tex" % contrast_id) 
+    #tio.Texture('', data=p).write(tex_labels_name)
     
     # write the prevalence map
     prevalence = np.zeros_like(p)
     prevalence[crmap>-1] =  LR.roi_prevalence()[crmap[crmap>-1]]
     tex_labels_name = op.join(swd, "prevalence_%s.tex" % contrast_id) 
     tio.Texture('', data=prevalence).write(tex_labels_name)
-    
+
+    # write the prevalence density
+    tex_labels_name = op.join(swd, "preval_dens_%s.tex" % contrast_id) 
+    #tio.Texture('', data=LR.prevalence_density()).write(tex_labels_name)
+    tio.Texture('', data=p).write(tex_labels_name)
+
     # write the individual maps
     for s in range(nbsubj):
         tex_labels_name = op.join(swd, "AR_s%04d_%s.tex" % (s, contrast_id))
@@ -204,7 +288,7 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
 
 theta = 2.5
 dmax = 10.
-ths = 5
+ths = 0
 smin = 5
 thq = 0.5
 precision = 100
@@ -220,12 +304,25 @@ texlon = [op.join(datadir, "sphere/ico100_7_lon.tex") for s in subj_id]
 
 # left hemisphere
 texfun = [op.sep.join((
-            datadir, "%s/fct/glm/default/Contrast/" % s,
+            datadir, "%s/fct/glm/smooth/Contrast/" % s,
             "left_computation-sentences_z_map.tex")) for s in subj_id]
 meshes = [op.join(datadir, "%s/surf/lh.r.aims.white.gii" % s) for s in subj_id]
 #meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'left_computation-sentences'
+
+lr, bf = make_surface_BSA(
+    meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
+    contrast_id)
+
+# right hemisphere
+texfun = [op.sep.join((
+            datadir, "%s/fct/glm/smooth/Contrast/" % s,
+            "right_computation-sentences_z_map.tex")) for s in subj_id]
+meshes = [op.join(datadir, "%s/surf/rh.r.aims.white.gii" % s) for s in subj_id]
+#meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
+swd = "/tmp"
+contrast_id = 'right_computation-sentences'
 
 lr, bf = make_surface_BSA(
     meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
