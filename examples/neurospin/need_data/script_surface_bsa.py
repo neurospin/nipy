@@ -83,9 +83,9 @@ def cv_kernel_vmm_density(x, bias, precision, domain, cv_index):
             ll[cv_index==i] = np.log(test_density)
         else:
             bias_t = bias[cv_index == i]
-            lwd = aux.weighted_density(xt)
-            ll[cv_index==i] = np.log(lwd[:, 0] * (1-bias_t) +  \
-                                         lwd[:, 1:].sum(1) * bias_t)
+            lwd = aux.density_per_component(xt)
+            lwd1 = lwd[:, 1:].mean(1)
+            ll[cv_index==i] = np.log(lwd1 * bias_t + lwd[:, 0] * (1-bias_t))
     mll = ll.mean()
     print mll
     return mll
@@ -148,10 +148,7 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
     #label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
     #print 'number of components', len(np.unique(label))
 
-    #cv_kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain, subjects)
-    #cv_kernel_vmm_density(gfc, None, precision, bf[0].domain, subjects)
-    #cv_kernel_vmm_density(gfc, 1-gf0, precision/2, bf[0].domain, subjects)
-    #cv_kernel_vmm_density(gfc, None, precision/2, bf[0].domain, subjects)
+    cv_kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain, subjects)
 
     vmm = kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain)
     
@@ -163,6 +160,7 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
 
     z = vmm.responsibilities(gfc)    
     label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
+    label[label> np.argmax(z, 1).max() -1] = -1
     print 'number of components', len(np.unique(label))
 
     p = vmm.mixture_density(dom.coord)
@@ -205,7 +203,7 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
     # derive the group-level landmarks
     # with a threshold on the number of subjects
     # that are represented in each one 
-    LR, nl = sbf.build_LR(bf, thq, ths, dmax, verbose=1)
+    LR, nl = sbf.build_LR(bf, thq, ths, dmax, verbose=0)
     
     # make a group-level map of the landmark position        
     crmap = bsa._relabel_(label, nl).astype(np.int)   
@@ -250,8 +248,9 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     lbeta = np.array(lbeta).T
 
     bf, gf0, sub, gfc = bsa.compute_individual_regions(
-        mesh_dom, lbeta, smin, theta, method='prior')
-    verbose = 1
+        mesh_dom, lbeta, smin, theta, method='prior', criterion='size', 
+        assign_val='max')
+    verbose = 0
     
     crmap, LR, bf, p = bsa_vmm(
         bf, gf0, sub, gfc, dmax, thq, ths, precision, verbose)
@@ -323,6 +322,7 @@ meshes = [op.join(datadir, "%s/surf/rh.r.aims.white.gii" % s) for s in subj_id]
 #meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
 swd = "/tmp"
 contrast_id = 'right_computation-sentences'
+
 
 lr, bf = make_surface_BSA(
     meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
