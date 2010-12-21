@@ -407,7 +407,6 @@ def design_matrix(
         _session = int(session)
     else:
         _session = misc["sessions"].index(session)
-    _names  = misc["tasks"]
 
     # get the paradigm
     if isinstance(paradigm_file, basestring):
@@ -418,7 +417,7 @@ def design_matrix(
     # compute the design matrix
     dmtx = dm.DesignMatrix(frametimes, _paradigm, hrf_model=hrf_model,
          drift_model=drift_model, hfcut=hfcut, drift_order=drift_order,
-         fir_delays=fir_delays, fir_duration=fir_duration, cond_ids=_names,
+         fir_delays=fir_delays, fir_duration=fir_duration,
          add_regs=add_regs, add_reg_names=add_reg_names)
     dmtx.estimate()
 
@@ -575,14 +574,20 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
         else:
             import nipy.neurospin.glm
             for s in sessions:
-                designs[s] = nipy.neurospin.glm.load(
-                    kargs['glm_config'][s]["GlmDumpFile"])
+                try:
+                    designs[s] = nipy.neurospin.glm.load(
+                        kargs['glm_config'][s]["GlmDumpFile"])
+                except:
+                    print "glm could not be loaded for session %s, \
+                           expect errors" %s
 
     # set the mask
     mask_url = None
-    if misc.has_key('mask_url'):
-        mask_url = misc['mask_url']
 
+    if misc.has_key('mask_url'): mask_url = misc['mask_url']
+    if contrast_struct.has_key('mask_url'):
+        mask_url = contrast_struct['mask_url']
+        
     # set the output paths
     if isinstance(CompletePaths, basestring) :
         CompletePaths = generate_brainvisa_ouput_paths(CompletePaths, 
@@ -596,25 +601,25 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
             multicon = dict()
 
             for key, value in contrast_struct[contrast].items():
-                if key != "Type" and key != "Dimension":
+                if key not in ["Type", "Dimension"]:
                     session = "_".join(key.split("_")[:-1])
-                    bv = [int(j) != 0 for j in value]
-                    if contrast_type == "t" and sum(bv)>0:
-                        _con = designs[session].contrast([int(i) for i in value])
+                    bv = np.asarray([int(j) for j in value])
+                    if contrast_type == "t" and bv.any():
+                        _con = designs[session].contrast(bv.astype(np.float))
                         final_contrast.append(_con)
 
                     if contrast_type == "F":
                         if not multicon.has_key(session):
-                            multicon[session] = np.array(bv)
+                            multicon[session] = bv.astype(np.float)
                         else:
-                            multicon[session] = np.vstack((multicon[session], bv))
+                            multicon[session] = np.vstack((
+                                multicon[session], bv.astype(np.float)))
             if contrast_type == "F":
                 for key, value in multicon.items():
                     if sum([j != 0 for j in value.reshape(-1)]) != 0:
                         _con = designs[key].contrast(value)    
                         final_contrast.append(_con)
         
-
             res_contrast = final_contrast[0]
             for c in final_contrast[1:]:
                 res_contrast = res_contrast + c
@@ -622,10 +627,17 @@ def compute_contrasts(contrast_struct, misc, CompletePaths, glms=None,
             
             # write misc information
             cpp = CompletePaths[contrast]
+            if kargs.has_key('cluster'): cpp['cluster'] = kargs['cluster']
+            if kargs.has_key('threshold'): cpp['threshold'] = kargs['threshold']
+            if kargs.has_key('method'): cpp['method'] = kargs['method']
             save_all_images(res_contrast, contrast_dimension, mask_url, cpp)
             misc[model]["con_dofs"][contrast] = res_contrast.dof
-        except ValueError:
-            'contrast %s does not fit into memory -- skipped' %contrast
+        #except ValueError,
+        #    'contrast %s does not fit into memory -- skipped' %contrast
+        except:
+            import sys
+            print "Unexpected error:", sys.exc_info()[0]
+            raise
     misc.write()
 
 

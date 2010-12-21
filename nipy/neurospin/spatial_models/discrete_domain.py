@@ -365,7 +365,7 @@ class MeshDomain(object):
         return G.to_coo_matrix()
 
 
-def domain_from_mesh(mesh):
+def domain_from_mesh(mesh, nibabel=True):
     """
     Instantiate a StructuredDomain from a gifti mesh
 
@@ -373,26 +373,32 @@ def domain_from_mesh(mesh):
     ----------
     mesh: nibabel gifti mesh instance, or path to such a mesh
     """
-    if isinstance(mesh, basestring):
-        from nibabel.gifti.gifti import loadImage
-        mesh_ = loadImage(mesh)
+    if nibabel:
+        if isinstance(mesh, basestring):
+            from nibabel.gifti.gifti import loadImage
+            mesh_ = loadImage(mesh)
+        else:
+            mesh_ = mesh
+            
+        if len(mesh_.darrays) == 2:
+            cor, tri = mesh_.darrays
+        elif len(mesh_.darrays) == 3:
+            cor, nor, tri = mesh_.darrays
+        else:
+            raise Exception("%d arrays in gifti file (case not handled)" \
+                            %len(mesh_.darrays))
+        mesh_dom = MeshDomain(cor.data, tri.data)
     else:
-        mesh_ = mesh
-        
-    if len(mesh_.darrays) == 2:
-        cor, tri = mesh_.darrays
-    elif len(mesh_.darrays) == 3:
-        cor, nor, tri = mesh_.darrays
-    else:
-        raise Exception("%d arrays in gifti file (case not handled)" \
-                        %len(mesh_.darrays))
-    mesh_dom = MeshDomain(cor.data, tri.data)
-
+        from gifti import loadImage
+        mesh_  = loadImage(mesh)
+        cor = mesh_.arrays[0].data
+        tri = mesh_.arrays[1].data
+        mesh_dom = MeshDomain(cor, tri)
+    
     vol = mesh_dom.area()
-    coord = cor.data
     topology = mesh_dom.topology()
     dim = 2
-    return StructuredDomain(dim, coord, vol, topology)
+    return StructuredDomain(dim, mesh_dom.coord, vol, topology)
 
     
 

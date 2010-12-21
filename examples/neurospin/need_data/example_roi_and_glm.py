@@ -20,7 +20,8 @@ import matplotlib.pylab as mp
 
 from nipy.io.imageformats import load, Nifti1Image
 import nipy.neurospin.utils.design_matrix as dm
-from nipy.neurospin.utils.simul_multisubject_fmri_dataset import surrogate_4d_dataset
+from nipy.neurospin.utils.simul_multisubject_fmri_dataset import \
+    surrogate_4d_dataset
 import get_data_light
 import nipy.neurospin.glm as GLM
 import nipy.neurospin.spatial_models.mroi as mroi
@@ -66,7 +67,7 @@ X, names = dm.dmtx_light(frametimes, paradigm, drift_model='Cosine', hfcut=128,
 # Get the FMRI data
 #######################################
 
-fmri_data = surrogate_4d_dataset(mask=mask, dmtx=X, seed=1)
+fmri_data = surrogate_4d_dataset(mask=mask, dmtx=X, seed=1)[0]
 
 # if you want to save it as an image
 # data_file = op.join(swd,'fmri_data.nii')
@@ -143,6 +144,7 @@ mp.xticks(np.arange(nreg-1), names[:-1])
 mp.legend()
 mp.title('parameters estimates for the roi time courses')
 bx =  mp.subplot(1, 2 ,2)
+
 my_roi.plot_feature('contrast', bx)
 mp.show()
 

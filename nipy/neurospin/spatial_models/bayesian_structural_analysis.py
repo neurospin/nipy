@@ -153,7 +153,8 @@ def signal_to_pproba(test, learn=None, method='prior', alpha=0.01, verbose=0):
     
 
 def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
-                               method='gauss_mixture', verbose=0, reshuffle=0):
+                                method='gauss_mixture', verbose=0, reshuffle=0, 
+                                criterion='size', assign_val='weighted_mean'):
     """
     Compute the  Bayesian Structural Activation paterns -
     with statistical validation
@@ -171,9 +172,15 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
     method: string, optional,
            method that is used to provide priori significance
            can be 'prior', 'gauss_mixture', 'gam_gauss' or 'emp_null'
-    verbose=0: verbosity mode
-    reshuffle=0: if nonzero, reshuffle the positions; this affects bf and gfc
-    
+    verbose: verbosity mode, optional
+    reshuffle:bool, otpional, 
+              if nonzero, reshuffle the positions; this affects bf and gfc
+    criterion: string, optional,
+               'size' or 'volume', thresholdding criterion
+    assign_val: string, optional,
+                to  be chosen in 'weighted mean', 'mean', 'min', 'max'
+                heuristic to assigna  blob-level signal
+
     Returns
     -------
     bf list of nipy.neurospin.spatial_models.hroi.Nroi instances
@@ -181,7 +188,7 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
        let nr be the number of terminal regions across subjects
     gf0, array of shape (nr)
          the mixture-based prior probability 
-         that the terminal regions are true positives
+         that the terminal regions are false positives
     sub, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
@@ -203,10 +210,11 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
         # description in terms of blobs
         beta = np.reshape(lbeta[:,s], (nvox,1))
         nroi = HROI_as_discrete_domain_blobs(domain, beta, threshold=theta,
-                                             smin=smin, id='nest_blob_s %s'%s)
+                                             smin=smin, rid='nest_blob_s %s'%s)
         
         if nroi.k>0:
-            bfm = nroi.representative_feature('signal', 'weighted mean')
+            #bfm = nroi.representative_feature('signal', 'weighted mean')
+            bfm = nroi.representative_feature('signal', 'max')
             bfm = bfm[nroi.isleaf()]
             
             # get the regions position
@@ -406,7 +414,7 @@ def bsa_dpmm2(bf, gf0, sub, gfc, dmax, thq, ths, verbose):
        let nr be the number of terminal regions across subjects
     gf0, array of shape (nr)
          the mixture-based prior probability 
-         that the terminal regions are true positives
+         that the terminal regions are false positives
     sub, array of shape (nr)
          the subject index associated with the terminal regions
     gfc, array of shape (nr, coord.shape[1])
