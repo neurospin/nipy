@@ -212,7 +212,7 @@ def compute_individual_regions (domain, lbeta, smin=5, theta=3.0,
         nroi = HROI_as_discrete_domain_blobs(domain, beta, threshold=theta,
                                              smin=smin, rid='nest_blob_s %s'%s)
         
-        if nroi.k>0:
+        if nroi is not None and nroi.k > 0:
             #bfm = nroi.representative_feature('signal', 'weighted mean')
             bfm = nroi.representative_feature('signal', 'max')
             bfm = bfm[nroi.isleaf()]

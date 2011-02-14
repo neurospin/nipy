@@ -135,9 +135,18 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
     if len(subjects) < 1:
         return crmap, LR, bf, p
 
-    subjects = np.concatenate(subjects).astype(np.int)
-    gfc = np.concatenate(gfc)
-    gf0 = np.concatenate(gf0)
+    if subjects.ndim > 1:
+        subjects = np.concatenate(subjects).astype(np.int)
+    else:
+        subjects = subjects.astype(int)
+    #if gfc.ndim > 1:
+    #    gfc = np.concatenate(gfc)
+    #else:
+    #    gfc = gfc.astype(int)
+    if gf0.ndim > 1:
+        gf0 = np.concatenate(gf0)
+    else:
+        gf0 = gf0.astype(int)
 
     # launch the VMM
     
@@ -149,7 +158,7 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
     #label = np.argmax(vmm.responsibilities(dom.coord), 1)-1
     #print 'number of components', len(np.unique(label))
 
-    cv_kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain, subjects)
+    #cv_kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain, subjects)
 
     vmm = kernel_vmm_density(gfc, 1-gf0, precision, bf[0].domain)
     
@@ -213,7 +222,7 @@ def bsa_vmm(bf, gf0, subjects, gfc, dmax, thq, ths, precision=100, verbose=0):
 
 def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
                      ths=0, thq=0.5, smin=0, precision=100, swd="/tmp/",
-                     contrast_id='cid'):
+                     contrast_id='cid', dmax=10):
     """
     Perform the computation of surface landmarks
     this function deals mainly with io
@@ -266,7 +275,8 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
     
     # write the prevalence map
     prevalence = np.zeros_like(p)
-    prevalence[crmap>-1] =  LR.roi_prevalence()[crmap[crmap>-1]]
+    if LR is not None:
+        prevalence[crmap>-1] =  LR.roi_prevalence()[crmap[crmap>-1]]
     tex_labels_name = op.join(swd, "prevalence_%s.tex" % contrast_id) 
     tio.Texture('', data=prevalence).write(tex_labels_name)
 
@@ -283,50 +293,53 @@ def make_surface_BSA(meshes, texfun, texlat, texlon, theta=3.,
         if bf[s] != None:
             label = bf[s].label.astype('int32')
         tio.Texture('', data=label).write(tex_labels_name)
+    
     return LR, bf
     
 
-
-theta = 2.5
-dmax = 10.
-ths = 0
-smin = 5
-thq = 0.5
-precision = 100
-
-subj_id = ['s12069', 's12300', 's12370', 's12405', 's12432', 's12539', 
-           's12635', 's12913', 's12081', 's12344', 's12381', 's12414', 
-           's12508', 's12562', 's12636', 's12919', 's12165', 's12352', 
-           's12401', 's12431', 's12532', 's12590', 's12898', 's12920']
-nbsubj = len(subj_id)
-datadir = "/data/thirion/virgile_internship_light/"
-texlat = [op.join(datadir, "sphere/ico100_7_lat.tex") for s in subj_id]
-texlon = [op.join(datadir, "sphere/ico100_7_lon.tex") for s in subj_id]
-
-# left hemisphere
-texfun = [op.sep.join((
-            datadir, "%s/fct/glm/smooth/Contrast/" % s,
-            "left_computation-sentences_z_map.tex")) for s in subj_id]
-meshes = [op.join(datadir, "%s/surf/lh.r.aims.white.gii" % s) for s in subj_id]
-#meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
-swd = "/tmp"
-contrast_id = 'left_computation-sentences'
-
-lr, bf = make_surface_BSA(
-    meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
-    contrast_id)
-
-# right hemisphere
-texfun = [op.sep.join((
-            datadir, "%s/fct/glm/smooth/Contrast/" % s,
-            "right_computation-sentences_z_map.tex")) for s in subj_id]
-meshes = [op.join(datadir, "%s/surf/rh.r.aims.white.gii" % s) for s in subj_id]
-#meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
-swd = "/tmp"
-contrast_id = 'right_computation-sentences'
-
-
-lr, bf = make_surface_BSA(
-    meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
-    contrast_id)
-
+if __name__ == "__main__":
+    theta = 2.5
+    dmax = 10.
+    ths = 0
+    smin = 5
+    thq = 0.5
+    precision = 100
+    
+    subj_id = ['s12069', 's12300', 's12370', 's12405', 's12432', 's12539', 
+               's12635', 's12913', 's12081', 's12344', 's12381', 's12414', 
+               's12508', 's12562', 's12636', 's12919', 's12165', 's12352', 
+               's12401', 's12431', 's12532', 's12590', 's12898', 's12920']
+    nbsubj = len(subj_id)
+    datadir = "/data/thirion/virgile_internship_light/"
+    texlat = [op.join(datadir, "sphere/ico100_7_lat.tex") for s in subj_id]
+    texlon = [op.join(datadir, "sphere/ico100_7_lon.tex") for s in subj_id]
+    
+    # left hemisphere
+    texfun = [op.sep.join((
+                datadir, "%s/fct/glm/smooth/Contrast/" % s,
+                "left_computation-sentences_z_map.tex")) for s in subj_id]
+    meshes = [op.join(datadir, "%s/surf/lh.r.aims.white.gii" % s) \
+              for s in subj_id]
+    #meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
+    swd = "/tmp"
+    contrast_id = 'left_computation-sentences'
+    
+    lr, bf = make_surface_BSA(
+        meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
+        contrast_id)
+    
+    # right hemisphere
+    texfun = [op.sep.join((
+                datadir, "%s/fct/glm/smooth/Contrast/" % s,
+                "right_computation-sentences_z_map.tex")) for s in subj_id]
+    meshes = [op.join(datadir, "%s/surf/rh.r.aims.white.gii" % s) \
+              for s in subj_id]
+    #meshes = [op.join(datadir,"sphere/ico100_7.gii") for s in subj_id]
+    swd = "/tmp"
+    contrast_id = 'right_computation-sentences'
+    
+    
+    lr, bf = make_surface_BSA(
+        meshes, texfun, texlat, texlon, theta, ths, thq, smin, precision, swd, 
+        contrast_id)
+    
